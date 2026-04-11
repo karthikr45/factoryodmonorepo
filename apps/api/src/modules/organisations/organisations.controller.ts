@@ -1,11 +1,89 @@
-import { Controller } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UsePipes,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+
+import {
+  inviteMemberSchema,
+  onboardOrganisationSchema,
+  updateOrganisationSchema,
+  type InviteMemberInput,
+  type OnboardOrganisationInput,
+  type UpdateOrganisationInput,
+} from '@repo/validators';
+
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from '../../common/decorators/current-user.decorator';
+import { OrgId } from '../../common/decorators/org-id.decorator';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 
 import { OrganisationsService } from './organisations.service';
 
+@ApiBearerAuth()
 @ApiTags('organisations')
 @Controller('organisations')
 export class OrganisationsController {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   constructor(private readonly organisationsService: OrganisationsService) {}
+
+  @Post('onboard')
+  @ApiOperation({ summary: 'Complete first-time organisation onboarding' })
+  @UsePipes(new ZodValidationPipe(onboardOrganisationSchema))
+  async onboard(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: OnboardOrganisationInput,
+  ): ReturnType<OrganisationsService['onboard']> {
+    return this.organisationsService.onboard(user.id, user.orgId, body);
+  }
+
+  @Get('current')
+  @ApiOperation({ summary: 'Get the current organisation details' })
+  async current(@OrgId() orgId: string): ReturnType<OrganisationsService['getCurrent']> {
+    return this.organisationsService.getCurrent(orgId);
+  }
+
+  @Patch('current')
+  @ApiOperation({ summary: 'Update current organisation settings' })
+  @UsePipes(new ZodValidationPipe(updateOrganisationSchema))
+  async update(
+    @OrgId() orgId: string,
+    @Body() body: UpdateOrganisationInput,
+  ): ReturnType<OrganisationsService['update']> {
+    return this.organisationsService.update(orgId, body);
+  }
+
+  @Get('members')
+  @ApiOperation({ summary: 'List all members of the organisation' })
+  async listMembers(
+    @OrgId() orgId: string,
+  ): ReturnType<OrganisationsService['listMembers']> {
+    return this.organisationsService.listMembers(orgId);
+  }
+
+  @Post('members')
+  @ApiOperation({ summary: 'Invite a new member by phone number' })
+  @UsePipes(new ZodValidationPipe(inviteMemberSchema))
+  async invite(
+    @OrgId() orgId: string,
+    @Body() body: InviteMemberInput,
+  ): ReturnType<OrganisationsService['inviteMember']> {
+    return this.organisationsService.inviteMember(orgId, body);
+  }
+
+  @Delete('members/:id')
+  @ApiOperation({ summary: 'Deactivate a member' })
+  async deactivate(
+    @OrgId() orgId: string,
+    @Param('id') id: string,
+  ): ReturnType<OrganisationsService['deactivateMember']> {
+    return this.organisationsService.deactivateMember(orgId, id);
+  }
 }

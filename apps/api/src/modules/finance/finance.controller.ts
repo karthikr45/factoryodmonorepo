@@ -1,11 +1,105 @@
-import { Controller } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  UsePipes,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+
+import {
+  createJournalEntrySchema,
+  createLedgerSchema,
+  type CreateJournalEntryInput,
+  type CreateLedgerInput,
+} from '@repo/validators';
+
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from '../../common/decorators/current-user.decorator';
+import { OrgId } from '../../common/decorators/org-id.decorator';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 
 import { FinanceService } from './finance.service';
 
+@ApiBearerAuth()
 @ApiTags('finance')
 @Controller('finance')
 export class FinanceController {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   constructor(private readonly financeService: FinanceService) {}
+
+  // ---- Ledgers ----
+  @Get('ledgers')
+  async listLedgers(
+    @OrgId() orgId: string,
+  ): ReturnType<FinanceService['listLedgers']> {
+    return this.financeService.listLedgers(orgId);
+  }
+
+  @Post('ledgers')
+  @UsePipes(new ZodValidationPipe(createLedgerSchema))
+  async createLedger(
+    @OrgId() orgId: string,
+    @Body() body: CreateLedgerInput,
+  ): ReturnType<FinanceService['createLedger']> {
+    return this.financeService.createLedger(orgId, body);
+  }
+
+  // ---- Journal ----
+  @Get('journal')
+  @ApiQuery({ name: 'from', required: false })
+  @ApiQuery({ name: 'to', required: false })
+  @ApiQuery({ name: 'ledgerCode', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'pageSize', required: false, type: Number })
+  async listJournal(
+    @OrgId() orgId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('ledgerCode') ledgerCode?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ): ReturnType<FinanceService['listJournal']> {
+    return this.financeService.listJournal(orgId, {
+      from: from ? new Date(from) : undefined,
+      to: to ? new Date(to) : undefined,
+      ledgerCode,
+      page: Number(page ?? 1),
+      pageSize: Math.min(Number(pageSize ?? 50), 200),
+    });
+  }
+
+  @Post('journal')
+  @ApiOperation({ summary: 'Manually post a journal entry' })
+  @UsePipes(new ZodValidationPipe(createJournalEntrySchema))
+  async createJournal(
+    @OrgId() orgId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: CreateJournalEntryInput,
+  ): ReturnType<FinanceService['createJournalEntry']> {
+    return this.financeService.createJournalEntry(orgId, user.id, body);
+  }
+
+  // ---- Reports ----
+  @Get('trial-balance')
+  @ApiQuery({ name: 'asOf', required: false })
+  async trialBalance(
+    @OrgId() orgId: string,
+    @Query('asOf') asOf?: string,
+  ): ReturnType<FinanceService['trialBalance']> {
+    return this.financeService.trialBalance(orgId, asOf ? new Date(asOf) : undefined);
+  }
+
+  @Get('profit-and-loss')
+  @ApiQuery({ name: 'from', required: true })
+  @ApiQuery({ name: 'to', required: true })
+  async pnl(
+    @OrgId() orgId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ): ReturnType<FinanceService['profitAndLoss']> {
+    return this.financeService.profitAndLoss(orgId, new Date(from), new Date(to));
+  }
 }

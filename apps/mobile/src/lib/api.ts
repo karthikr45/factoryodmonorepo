@@ -2,8 +2,10 @@
  * Axios instance for the mobile app.
  * Reads API base URL from Expo public env vars and attaches the JWT from SecureStore.
  */
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, type AxiosRequestConfig, type AxiosResponse } from 'axios';
 import Constants from 'expo-constants';
+
+import type { ApiResponse, ErrorResponse } from '@repo/types';
 
 import { getAccessToken } from './storage';
 
@@ -23,3 +25,17 @@ api.interceptors.request.use(async (config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (res) => res,
+  (error: { response?: AxiosResponse<ErrorResponse>; message: string }) => {
+    const msg =
+      error.response?.data?.error?.message ?? error.message ?? 'Request failed';
+    return Promise.reject(new Error(msg));
+  },
+);
+
+export async function apiCall<T>(config: AxiosRequestConfig): Promise<T> {
+  const res = await api.request<ApiResponse<T>>(config);
+  return res.data.data;
+}

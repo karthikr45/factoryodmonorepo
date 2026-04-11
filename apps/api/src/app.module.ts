@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
+import { AccountingModule } from './common/accounting/accounting.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -26,6 +27,7 @@ import { HealthController } from './health.controller';
     ]),
 
     PrismaModule,
+    AccountingModule,
     AuthModule,
     OrganisationsModule,
     OrdersModule,

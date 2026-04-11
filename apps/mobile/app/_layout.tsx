@@ -20,6 +20,7 @@ export default function RootLayout(): JSX.Element {
     <QueryClientProvider client={client}>
       <SafeAreaProvider>
         <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(factory)" />
           <Stack.Screen name="(floor)" />
