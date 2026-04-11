@@ -1,0 +1,529 @@
+// FactoryOS Prisma schema
+// Single source of truth for the entire database.
+// Multi-tenancy: every row-scoped table carries orgId.
+// Money: always stored as BigInt paise (₹1 = 100 paise). Never floats.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ======================================================================
+// Enums
+// ======================================================================
+
+enum OrganisationType {
+  FACTORY
+  AGENCY
+  CA_FIRM
+}
+
+enum OrganisationPlan {
+  FREE
+  PRO
+}
+
+enum UserRole {
+  OWNER
+  MANAGER
+  CA
+  AGENCY_ADMIN
+  WORKER
+}
+
+enum OrderStatus {
+  ENQUIRY
+  CONFIRMED
+  IN_PRODUCTION
+  QUALITY_CHECK
+  READY
+  DISPATCHED
+  DELIVERED
+  CANCELLED
+}
+
+enum JobCardStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  HOLIDAY
+}
+
+enum WorkerDeploymentStatus {
+  ACTIVE
+  COMPLETED
+  TERMINATED
+}
+
+enum PayrollStatus {
+  DRAFT
+  APPROVED
+  PAID
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  RECEIVED
+  PARTIALLY_RECEIVED
+  CANCELLED
+}
+
+enum JournalSourceType {
+  ORDER
+  ATTENDANCE
+  PURCHASE
+  MANUAL
+}
+
+enum LedgerType {
+  ASSET
+  LIABILITY
+  INCOME
+  EXPENSE
+  EQUITY
+}
+
+enum GSTReturnType {
+  GSTR1
+  GSTR3B
+  GSTR9
+}
+
+enum GSTReturnStatus {
+  DRAFT
+  FILED
+  PENDING
+}
+
+enum NotificationChannel {
+  INAPP
+  WHATSAPP
+  SMS
+  EMAIL
+}
+
+enum NotificationType {
+  ORDER_STATUS_CHANGED
+  JOBCARD_ASSIGNED
+  JOBCARD_COMPLETED
+  ATTENDANCE_MARKED
+  ATTENDANCE_APPROVED
+  ATTENDANCE_DISPUTED
+  PAYROLL_READY
+  CA_QUERY_RAISED
+  GST_RETURN_DUE
+  GENERIC
+}
+
+// ======================================================================
+// Core tables
+// ======================================================================
+
+model Organisation {
+  id        String           @id @default(uuid())
+  name      String
+  gstin     String?          @unique
+  type      OrganisationType
+  plan      OrganisationPlan @default(FREE)
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  users             User[]
+  departments       Department[]
+  orders            Order[]
+  jobCards          JobCard[]
+  customers         Customer[]
+  workers           Worker[]           @relation("AgencyWorkers")
+  deploymentsAsFactory WorkerDeployment[] @relation("FactoryDeployments")
+  deploymentsAsAgency  WorkerDeployment[] @relation("AgencyDeployments")
+  attendanceAsFactory  AttendanceRecord[] @relation("FactoryAttendance")
+  attendanceAsAgency   AttendanceRecord[] @relation("AgencyAttendance")
+  payrollsAsFactory    Payroll[]          @relation("FactoryPayrolls")
+  payrollsAsAgency     Payroll[]          @relation("AgencyPayrolls")
+  purchaseOrders    PurchaseOrder[]
+  vendors           Vendor[]
+  journalEntries    JournalEntry[]
+  ledgers           Ledger[]
+  gstReturns        GSTReturn[]
+  notifications     Notification[]
+
+  @@index([type])
+  @@index([isActive])
+  @@map("organisations")
+}
+
+model User {
+  id        String    @id @default(uuid())
+  orgId     String
+  name      String
+  phone     String    @unique
+  email     String?   @unique
+  role      UserRole
+  isActive  Boolean   @default(true)
+  lastLogin DateTime?
+  createdAt DateTime  @default(now())
+
+  organisation   Organisation       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  departments    Department[]       @relation("DepartmentManager")
+  ordersCreated  Order[]            @relation("OrderCreatedBy")
+  jobCardsAssigned JobCard[]        @relation("JobCardAssignee")
+  attendanceMarked AttendanceRecord[] @relation("AttendanceMarker")
+  attendanceApproved AttendanceRecord[] @relation("AttendanceApprover")
+  journalEntries JournalEntry[]     @relation("JournalCreator")
+  gstReturnsFiled GSTReturn[]       @relation("GSTFiler")
+  notifications  Notification[]
+
+  @@index([orgId])
+  @@index([phone])
+  @@index([role])
+  @@map("users")
+}
+
+model OTP {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([phone, code])
+  @@index([expiresAt])
+  @@map("otps")
+}
+
+model Department {
+  id        String  @id @default(uuid())
+  orgId     String
+  name      String
+  managerId String?
+  sequence  Int     @default(0)
+  isActive  Boolean @default(true)
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  manager      User?        @relation("DepartmentManager", fields: [managerId], references: [id])
+  jobCards     JobCard[]
+
+  @@index([orgId])
+  @@index([orgId, sequence])
+  @@map("departments")
+}
+
+model Order {
+  id           String      @id @default(uuid())
+  orgId        String
+  customerId   String
+  orderNumber  String
+  productName  String
+  quantity     Float
+  unit         String
+  deliveryDate DateTime
+  status       OrderStatus @default(ENQUIRY)
+  totalValue   BigInt      // paise
+  advancePaid  BigInt      @default(0) // paise
+  notes        String?
+  createdBy    String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id])
+  creator      User         @relation("OrderCreatedBy", fields: [createdBy], references: [id])
+  jobCards     JobCard[]
+
+  @@unique([orgId, orderNumber])
+  @@index([orgId])
+  @@index([orgId, status])
+  @@index([customerId])
+  @@map("orders")
+}
+
+model JobCard {
+  id             String        @id @default(uuid())
+  orderId        String
+  departmentId   String
+  orgId          String
+  assignedTo     String?
+  status         JobCardStatus @default(PENDING)
+  startedAt      DateTime?
+  completedAt    DateTime?
+  notes          String?
+  estimatedHours Float?
+
+  order        Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  department   Department   @relation(fields: [departmentId], references: [id])
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  assignee     User?        @relation("JobCardAssignee", fields: [assignedTo], references: [id])
+
+  @@index([orgId])
+  @@index([orderId])
+  @@index([departmentId, status])
+  @@map("job_cards")
+}
+
+model Customer {
+  id                String  @id @default(uuid())
+  orgId             String
+  name              String
+  phone             String
+  email             String?
+  gstin             String?
+  address           String?
+  creditLimit       BigInt  @default(0) // paise
+  outstandingAmount BigInt  @default(0) // paise
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  orders       Order[]
+
+  @@index([orgId])
+  @@index([orgId, name])
+  @@map("customers")
+}
+
+// ======================================================================
+// Workers / attendance / payroll (staffing agency domain)
+// ======================================================================
+
+model Worker {
+  id           String   @id @default(uuid())
+  agencyOrgId  String
+  name         String
+  phone        String
+  aadhaarLast4 String
+  skill        String
+  dailyRate    BigInt   // paise
+  epfNumber    String?
+  esicNumber   String?
+  isActive     Boolean  @default(true)
+  joinedAt     DateTime @default(now())
+
+  agency      Organisation       @relation("AgencyWorkers", fields: [agencyOrgId], references: [id], onDelete: Cascade)
+  deployments WorkerDeployment[]
+  attendance  AttendanceRecord[]
+  payrolls    Payroll[]
+
+  @@index([agencyOrgId])
+  @@index([isActive])
+  @@map("workers")
+}
+
+model WorkerDeployment {
+  id           String                 @id @default(uuid())
+  workerId     String
+  factoryOrgId String
+  agencyOrgId  String
+  startDate    DateTime
+  endDate      DateTime?
+  status       WorkerDeploymentStatus @default(ACTIVE)
+
+  worker  Worker       @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  factory Organisation @relation("FactoryDeployments", fields: [factoryOrgId], references: [id])
+  agency  Organisation @relation("AgencyDeployments", fields: [agencyOrgId], references: [id])
+
+  @@index([workerId])
+  @@index([factoryOrgId, status])
+  @@index([agencyOrgId, status])
+  @@map("worker_deployments")
+}
+
+model AttendanceRecord {
+  id           String           @id @default(uuid())
+  workerId     String
+  factoryOrgId String
+  agencyOrgId  String
+  date         DateTime         @db.Date
+  status       AttendanceStatus
+  overtime     Float            @default(0) // hours
+  markedBy     String
+  approvedBy   String?
+  approvedAt   DateTime?
+  disputeNote  String?
+  isDisputed   Boolean          @default(false)
+
+  worker   Worker       @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  factory  Organisation @relation("FactoryAttendance", fields: [factoryOrgId], references: [id])
+  agency   Organisation @relation("AgencyAttendance", fields: [agencyOrgId], references: [id])
+  marker   User         @relation("AttendanceMarker", fields: [markedBy], references: [id])
+  approver User?        @relation("AttendanceApprover", fields: [approvedBy], references: [id])
+
+  @@unique([workerId, date])
+  @@index([factoryOrgId, date])
+  @@index([agencyOrgId, date])
+  @@index([isDisputed])
+  @@map("attendance_records")
+}
+
+model Payroll {
+  id             String        @id @default(uuid())
+  workerId       String
+  agencyOrgId    String
+  factoryOrgId   String
+  month          Int
+  year           Int
+  daysPresent    Int
+  daysAbsent     Int
+  overtimeHours  Float
+  basicAmount    BigInt        // paise
+  epfDeduction   BigInt        // paise
+  esicDeduction  BigInt        // paise
+  netAmount      BigInt        // paise
+  status         PayrollStatus @default(DRAFT)
+  paidAt         DateTime?
+
+  worker  Worker       @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  agency  Organisation @relation("AgencyPayrolls", fields: [agencyOrgId], references: [id])
+  factory Organisation @relation("FactoryPayrolls", fields: [factoryOrgId], references: [id])
+
+  @@unique([workerId, month, year])
+  @@index([agencyOrgId, month, year])
+  @@index([factoryOrgId, month, year])
+  @@map("payrolls")
+}
+
+// ======================================================================
+// Procurement
+// ======================================================================
+
+model PurchaseOrder {
+  id           String              @id @default(uuid())
+  orgId        String
+  vendorId     String
+  poNumber     String
+  items        Json
+  totalAmount  BigInt              // paise
+  gstAmount    BigInt              // paise
+  status       PurchaseOrderStatus @default(DRAFT)
+  expectedDate DateTime?
+  receivedDate DateTime?
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  vendor       Vendor       @relation(fields: [vendorId], references: [id])
+
+  @@unique([orgId, poNumber])
+  @@index([orgId, status])
+  @@index([vendorId])
+  @@map("purchase_orders")
+}
+
+model Vendor {
+  id          String  @id @default(uuid())
+  orgId       String
+  name        String
+  phone       String
+  gstin       String?
+  address     String?
+  rating      Float?
+  totalOrders Int     @default(0)
+
+  organisation   Organisation    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  purchaseOrders PurchaseOrder[]
+
+  @@index([orgId])
+  @@index([orgId, name])
+  @@map("vendors")
+}
+
+// ======================================================================
+// Finance / accounting
+// ======================================================================
+
+model JournalEntry {
+  id            String            @id @default(uuid())
+  orgId         String
+  date          DateTime          @db.Date
+  description   String
+  debitLedger   String
+  creditLedger  String
+  amount        BigInt            // paise
+  currency      String            @default("INR")
+  sourceType    JournalSourceType @default(MANUAL)
+  sourceId      String?
+  createdAuto   Boolean           @default(false)
+  createdBy     String?
+  financialYear String
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  creator      User?        @relation("JournalCreator", fields: [createdBy], references: [id])
+
+  @@index([orgId, date])
+  @@index([orgId, financialYear])
+  @@index([sourceType, sourceId])
+  @@map("journal_entries")
+}
+
+model Ledger {
+  id       String     @id @default(uuid())
+  orgId    String
+  name     String
+  type     LedgerType
+  parentId String?
+  code     String
+  isSystem Boolean    @default(false)
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  parent       Ledger?      @relation("LedgerHierarchy", fields: [parentId], references: [id])
+  children     Ledger[]     @relation("LedgerHierarchy")
+
+  @@unique([orgId, code])
+  @@index([orgId, type])
+  @@map("ledgers")
+}
+
+model GSTReturn {
+  id       String          @id @default(uuid())
+  orgId    String
+  period   String
+  type     GSTReturnType
+  status   GSTReturnStatus @default(DRAFT)
+  filedAt  DateTime?
+  filedBy  String?
+  data     Json
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  filer        User?        @relation("GSTFiler", fields: [filedBy], references: [id])
+
+  @@unique([orgId, period, type])
+  @@index([orgId, status])
+  @@map("gst_returns")
+}
+
+// ======================================================================
+// Notifications
+// ======================================================================
+
+model Notification {
+  id       String              @id @default(uuid())
+  userId   String
+  orgId    String
+  type     NotificationType
+  title    String
+  body     String
+  isRead   Boolean             @default(false)
+  channel  NotificationChannel @default(INAPP)
+  metadata Json?
+  sentAt   DateTime?
+  createdAt DateTime           @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([orgId])
+  @@index([createdAt])
+  @@map("notifications")
+}
