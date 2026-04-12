@@ -161,6 +161,20 @@ model Organisation {
   ledgers           Ledger[]
   gstReturns        GSTReturn[]
   notifications     Notification[]
+  // Sprint 1-5 relations
+  fileAttachments   FileAttachment[]
+  checkIns          CheckInOut[]       @relation("FactoryCheckIns")
+  inventoryItems    InventoryItem[]
+  stockMovements    StockMovement[]
+  qualityChecks     QualityCheck[]
+  transporters      Transporter[]
+  dispatches        Dispatch[]
+  quotations        Quotation[]
+  invoices          Invoice[]
+  chatRooms         ChatRoom[]
+  billsOfMaterial   BillOfMaterial[]
+  whatsappMessages  WhatsAppMessage[]
+  videoCalls        VideoCall[]
 
   @@index([type])
   @@index([isActive])
@@ -187,6 +201,15 @@ model User {
   journalEntries JournalEntry[]     @relation("JournalCreator")
   gstReturnsFiled GSTReturn[]       @relation("GSTFiler")
   notifications  Notification[]
+  // Sprint 1-5 relations
+  filesUploaded    FileAttachment[]  @relation("FileUploader")
+  stockMovements   StockMovement[]   @relation("StockMovementCreator")
+  qcInspections    QualityCheck[]    @relation("QCInspector")
+  quotationsCreated Quotation[]      @relation("QuotationCreator")
+  invoicesCreated  Invoice[]         @relation("InvoiceCreator")
+  chatMemberships  ChatMember[]
+  messagesSent     ChatMessage[]     @relation("MessageSender")
+  videoCallsInitiated VideoCall[]    @relation("CallInitiator")
 
   @@index([orgId])
   @@index([phone])
@@ -241,10 +264,14 @@ model Order {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  customer     Customer     @relation(fields: [customerId], references: [id])
-  creator      User         @relation("OrderCreatedBy", fields: [createdBy], references: [id])
+  organisation Organisation    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  customer     Customer        @relation(fields: [customerId], references: [id])
+  creator      User            @relation("OrderCreatedBy", fields: [createdBy], references: [id])
   jobCards     JobCard[]
+  qualityChecks QualityCheck[]
+  dispatches   Dispatch[]
+  invoices     Invoice[]
+  quotation    Quotation?      @relation("QuotationOrder")
 
   @@unique([orgId, orderNumber])
   @@index([orgId])
@@ -265,10 +292,11 @@ model JobCard {
   notes          String?
   estimatedHours Float?
 
-  order        Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  department   Department   @relation(fields: [departmentId], references: [id])
-  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  assignee     User?        @relation("JobCardAssignee", fields: [assignedTo], references: [id])
+  order         Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  department    Department     @relation(fields: [departmentId], references: [id])
+  organisation  Organisation   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  assignee      User?          @relation("JobCardAssignee", fields: [assignedTo], references: [id])
+  qualityChecks QualityCheck[]
 
   @@index([orgId])
   @@index([orderId])
@@ -289,6 +317,8 @@ model Customer {
 
   organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
   orders       Order[]
+  quotations   Quotation[]
+  invoices     Invoice[]
 
   @@index([orgId])
   @@index([orgId, name])
@@ -316,6 +346,7 @@ model Worker {
   deployments WorkerDeployment[]
   attendance  AttendanceRecord[]
   payrolls    Payroll[]
+  checkIns    CheckInOut[]
 
   @@index([agencyOrgId])
   @@index([isActive])
@@ -526,4 +557,459 @@ model Notification {
   @@index([orgId])
   @@index([createdAt])
   @@map("notifications")
+}
+
+// ======================================================================
+// Sprint 1: File storage, Check-in/out, Inventory, Quality checks
+// ======================================================================
+
+enum FileCategory {
+  INVOICE
+  CHALLAN
+  QC_CERTIFICATE
+  WORKER_DOCUMENT
+  RECEIPT
+  PURCHASE_ORDER
+  QUOTATION
+  PROFILE_PHOTO
+  PROOF_OF_DELIVERY
+  OTHER
+}
+
+enum ShiftType {
+  MORNING
+  EVENING
+  NIGHT
+  GENERAL
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+enum StockReferenceType {
+  PURCHASE
+  PRODUCTION
+  MANUAL
+  RETURN
+}
+
+enum QualityCheckStatus {
+  PENDING
+  PASSED
+  FAILED
+  REWORK
+}
+
+model FileAttachment {
+  id           String       @id @default(uuid())
+  orgId        String
+  fileName     String
+  fileUrl      String
+  fileSize     Int
+  mimeType     String
+  category     FileCategory @default(OTHER)
+  relatedType  String?
+  relatedId    String?
+  uploadedBy   String
+  createdAt    DateTime     @default(now())
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  uploader     User         @relation("FileUploader", fields: [uploadedBy], references: [id])
+
+  @@index([orgId, category])
+  @@index([relatedType, relatedId])
+  @@map("file_attachments")
+}
+
+model CheckInOut {
+  id           String    @id @default(uuid())
+  workerId     String
+  factoryOrgId String
+  date         DateTime  @db.Date
+  checkInTime  DateTime?
+  checkOutTime DateTime?
+  checkInLat   Float?
+  checkInLng   Float?
+  checkOutLat  Float?
+  checkOutLng  Float?
+  shiftType    ShiftType @default(GENERAL)
+  isLate       Boolean   @default(false)
+  isEarlyLeave Boolean   @default(false)
+  totalHours   Float?
+  notes        String?
+
+  worker  Worker       @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  factory Organisation @relation("FactoryCheckIns", fields: [factoryOrgId], references: [id])
+
+  @@unique([workerId, date, shiftType])
+  @@index([factoryOrgId, date])
+  @@index([workerId, date])
+  @@map("check_in_outs")
+}
+
+model InventoryItem {
+  id           String  @id @default(uuid())
+  orgId        String
+  name         String
+  sku          String?
+  unit         String
+  currentStock Float   @default(0)
+  minimumStock Float   @default(0)
+  location     String?
+  category     String?
+  costPerUnit  BigInt  @default(0) // paise
+
+  organisation Organisation    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  movements    StockMovement[]
+  bomItems     BOMItem[]
+
+  @@unique([orgId, sku])
+  @@index([orgId])
+  @@index([orgId, category])
+  @@map("inventory_items")
+}
+
+model StockMovement {
+  id              String             @id @default(uuid())
+  inventoryItemId String
+  orgId           String
+  type            StockMovementType
+  quantity        Float
+  referenceType   StockReferenceType @default(MANUAL)
+  referenceId     String?
+  notes           String?
+  createdBy       String
+  createdAt       DateTime           @default(now())
+
+  item         InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  organisation Organisation  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  creator      User          @relation("StockMovementCreator", fields: [createdBy], references: [id])
+
+  @@index([inventoryItemId])
+  @@index([orgId, createdAt])
+  @@map("stock_movements")
+}
+
+model QualityCheck {
+  id             String             @id @default(uuid())
+  orgId          String
+  orderId        String?
+  jobCardId      String?
+  checklistItems Json
+  status         QualityCheckStatus @default(PENDING)
+  defectNotes    String?
+  inspectedBy    String?
+  inspectedAt    DateTime?
+  createdAt      DateTime           @default(now())
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  order        Order?       @relation(fields: [orderId], references: [id])
+  jobCard      JobCard?     @relation(fields: [jobCardId], references: [id])
+  inspector    User?        @relation("QCInspector", fields: [inspectedBy], references: [id])
+
+  @@index([orgId, status])
+  @@index([orderId])
+  @@map("quality_checks")
+}
+
+// ======================================================================
+// Sprint 2: Transport, Invoices, Quotations
+// ======================================================================
+
+enum DispatchStatus {
+  PREPARING
+  DISPATCHED
+  IN_TRANSIT
+  DELIVERED
+  RETURNED
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PARTIALLY_PAID
+  CANCELLED
+  OVERDUE
+}
+
+model Transporter {
+  id            String  @id @default(uuid())
+  orgId         String
+  name          String
+  phone         String
+  vehicleNumber String?
+  vehicleType   String?
+  isActive      Boolean @default(true)
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  dispatches   Dispatch[]
+
+  @@index([orgId])
+  @@map("transporters")
+}
+
+model Dispatch {
+  id                   String         @id @default(uuid())
+  orgId                String
+  orderId              String
+  transporterId        String?
+  vehicleNumber        String?
+  driverName           String?
+  driverPhone          String?
+  ewayBillNumber       String?
+  dispatchDate         DateTime
+  expectedDeliveryDate DateTime?
+  deliveredAt          DateTime?
+  proofOfDeliveryUrl   String?
+  freightCost          BigInt         @default(0) // paise
+  status               DispatchStatus @default(PREPARING)
+  notes                String?
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  order        Order        @relation(fields: [orderId], references: [id])
+  transporter  Transporter? @relation(fields: [transporterId], references: [id])
+
+  @@index([orgId, status])
+  @@index([orderId])
+  @@map("dispatches")
+}
+
+model Quotation {
+  id               String          @id @default(uuid())
+  orgId            String
+  customerId       String
+  quotationNumber  String
+  items            Json
+  subtotal         BigInt          // paise
+  gstAmount        BigInt          // paise
+  totalAmount      BigInt          // paise
+  validUntil       DateTime
+  status           QuotationStatus @default(DRAFT)
+  convertedOrderId String?         @unique
+  notes            String?
+  createdBy        String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  organisation  Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  customer      Customer     @relation(fields: [customerId], references: [id])
+  creator       User         @relation("QuotationCreator", fields: [createdBy], references: [id])
+  convertedOrder Order?      @relation("QuotationOrder", fields: [convertedOrderId], references: [id])
+
+  @@unique([orgId, quotationNumber])
+  @@index([orgId, status])
+  @@index([customerId])
+  @@map("quotations")
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  orgId         String
+  orderId       String?
+  customerId    String
+  invoiceNumber String
+  invoiceDate   DateTime      @db.Date
+  dueDate       DateTime?     @db.Date
+  items         Json
+  subtotal      BigInt        // paise
+  gstAmount     BigInt        // paise
+  totalAmount   BigInt        // paise
+  paidAmount    BigInt        @default(0) // paise
+  status        InvoiceStatus @default(DRAFT)
+  pdfUrl        String?
+  einvoiceJson  Json?
+  notes         String?
+  createdBy     String
+  createdAt     DateTime      @default(now())
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  order        Order?       @relation(fields: [orderId], references: [id])
+  customer     Customer     @relation(fields: [customerId], references: [id])
+  creator      User         @relation("InvoiceCreator", fields: [createdBy], references: [id])
+
+  @@unique([orgId, invoiceNumber])
+  @@index([orgId, status])
+  @@index([customerId])
+  @@map("invoices")
+}
+
+// ======================================================================
+// Sprint 3: Chat, BOM
+// ======================================================================
+
+enum ChatRoomType {
+  GROUP
+  DIRECT
+  ORDER_DISCUSSION
+}
+
+enum MessageType {
+  TEXT
+  FILE
+  SYSTEM
+}
+
+model ChatRoom {
+  id          String       @id @default(uuid())
+  orgId       String
+  name        String?
+  type        ChatRoomType @default(GROUP)
+  relatedType String?
+  relatedId   String?
+  createdAt   DateTime     @default(now())
+
+  organisation Organisation  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  members      ChatMember[]
+  messages     ChatMessage[]
+
+  @@index([orgId])
+  @@index([relatedType, relatedId])
+  @@map("chat_rooms")
+}
+
+model ChatMember {
+  id       String   @id @default(uuid())
+  roomId   String
+  userId   String
+  joinedAt DateTime @default(now())
+  mutedAt  DateTime?
+
+  room ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([userId])
+  @@map("chat_members")
+}
+
+model ChatMessage {
+  id          String      @id @default(uuid())
+  roomId      String
+  senderId    String
+  content     String
+  messageType MessageType @default(TEXT)
+  fileUrl     String?
+  replyToId   String?
+  readBy      Json        @default("[]")
+  createdAt   DateTime    @default(now())
+  editedAt    DateTime?
+
+  room    ChatRoom     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender  User         @relation("MessageSender", fields: [senderId], references: [id])
+  replyTo ChatMessage? @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies ChatMessage[] @relation("MessageReplies")
+
+  @@index([roomId, createdAt])
+  @@index([senderId])
+  @@map("chat_messages")
+}
+
+model BillOfMaterial {
+  id          String   @id @default(uuid())
+  orgId       String
+  productName String
+  productCode String?
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  items        BOMItem[]
+
+  @@unique([orgId, productCode])
+  @@index([orgId])
+  @@map("bills_of_material")
+}
+
+model BOMItem {
+  id              String @id @default(uuid())
+  bomId           String
+  inventoryItemId String
+  quantity        Float
+  unit            String
+  wastagePercent  Float  @default(0)
+
+  bom           BillOfMaterial @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem  @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([bomId])
+  @@map("bom_items")
+}
+
+// ======================================================================
+// Sprint 4: WhatsApp message log
+// ======================================================================
+
+enum WhatsAppMessageStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+model WhatsAppMessage {
+  id          String                 @id @default(uuid())
+  orgId       String
+  phone       String
+  templateName String?
+  content     String
+  direction   String                 @default("OUTBOUND") // OUTBOUND or INBOUND
+  status      WhatsAppMessageStatus  @default(QUEUED)
+  waMessageId String?
+  metadata    Json?
+  sentAt      DateTime?
+  createdAt   DateTime               @default(now())
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt])
+  @@index([phone])
+  @@map("whatsapp_messages")
+}
+
+// ======================================================================
+// Sprint 5: Video calls
+// ======================================================================
+
+enum VideoCallStatus {
+  RINGING
+  ACTIVE
+  ENDED
+  MISSED
+}
+
+model VideoCall {
+  id           String          @id @default(uuid())
+  orgId        String
+  roomToken    String          @unique
+  initiatedBy  String
+  callType     String          @default("VIDEO") // VIDEO or AUDIO
+  status       VideoCallStatus @default(RINGING)
+  participants Json            @default("[]")
+  relatedType  String?
+  relatedId    String?
+  startedAt    DateTime        @default(now())
+  endedAt      DateTime?
+  durationSecs Int?
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  initiator    User         @relation("CallInitiator", fields: [initiatedBy], references: [id])
+
+  @@index([orgId, startedAt])
+  @@map("video_calls")
 }
