@@ -5,7 +5,8 @@
   "description": "FactoryOS - Manufacturing operations and finance platform for SMB manufacturers",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "pnpm build:packages && turbo run dev",
+    "build:packages": "pnpm --filter @repo/types build && pnpm --filter @repo/validators build",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
