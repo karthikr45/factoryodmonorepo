@@ -212,6 +212,28 @@ export class ProcurementService {
         where: { id: po.vendorId },
         data: { totalOrders: { increment: 1 } },
       });
+
+      // Auto stock-in: try to match PO items to inventory items by description
+      const poItems = po.items as Array<{ description: string; quantity: number; unit: string }>;
+      for (const item of poItems) {
+        const invItem = await this.prisma.client.inventoryItem.findFirst({
+          where: { orgId, name: { contains: item.description, mode: 'insensitive' } },
+        });
+        if (invItem) {
+          await this.prisma.client.inventoryItem.update({
+            where: { id: invItem.id },
+            data: { currentStock: { increment: item.quantity } },
+          });
+          await this.prisma.client.stockMovement.create({
+            data: {
+              inventoryItemId: invItem.id, orgId, type: 'IN',
+              quantity: item.quantity, referenceType: 'PURCHASE',
+              referenceId: id, notes: `Auto stock-in from PO ${po.poNumber}`,
+              createdBy: orgId, // system
+            },
+          });
+        }
+      }
     }
 
     this.gateway.emitToOrg(orgId, 'po:status_changed', {

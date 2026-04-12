@@ -26,13 +26,17 @@ import {
 import { OrgId } from '../../common/decorators/org-id.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 
+import { EmployeesService } from './employees.service';
 import { OrganisationsService } from './organisations.service';
 
 @ApiBearerAuth()
 @ApiTags('organisations')
 @Controller('organisations')
 export class OrganisationsController {
-  constructor(private readonly organisationsService: OrganisationsService) {}
+  constructor(
+    private readonly organisationsService: OrganisationsService,
+    private readonly employeesService: EmployeesService,
+  ) {}
 
   @Post('onboard')
   @ApiOperation({ summary: 'Complete first-time organisation onboarding' })
@@ -85,5 +89,36 @@ export class OrganisationsController {
     @Param('id') id: string,
   ): ReturnType<OrganisationsService['deactivateMember']> {
     return this.organisationsService.deactivateMember(orgId, id);
+  }
+
+  // ---- Employees (unified view: direct + contract) ----
+  @Get('employees')
+  @ApiOperation({ summary: 'All people working at this factory (direct + contract)' })
+  async listAllEmployees(
+    @OrgId() orgId: string,
+  ): ReturnType<EmployeesService['listAll']> {
+    return this.employeesService.listAll(orgId);
+  }
+
+  @Post('employees')
+  @ApiOperation({ summary: 'Add a direct employee to the factory' })
+  async addEmployee(
+    @OrgId() orgId: string,
+    @Body() body: {
+      name: string; phone: string; email?: string; role: 'MANAGER' | 'WORKER';
+      departmentId?: string; designation: string; monthlySalary: number;
+      aadhaarLast4?: string; panNumber?: string;
+    },
+  ): ReturnType<EmployeesService['addDirectEmployee']> {
+    return this.employeesService.addDirectEmployee(orgId, body);
+  }
+
+  @Get('employees/:id')
+  @ApiOperation({ summary: 'Get employee profile (direct employee)' })
+  async getEmployee(
+    @OrgId() orgId: string,
+    @Param('id') id: string,
+  ): ReturnType<EmployeesService['getProfile']> {
+    return this.employeesService.getProfile(orgId, id);
   }
 }

@@ -175,6 +175,7 @@ model Organisation {
   billsOfMaterial   BillOfMaterial[]
   whatsappMessages  WhatsAppMessage[]
   videoCalls        VideoCall[]
+  employeeProfiles  EmployeeProfile[]
 
   @@index([type])
   @@index([isActive])
@@ -210,6 +211,8 @@ model User {
   chatMemberships  ChatMember[]
   messagesSent     ChatMessage[]     @relation("MessageSender")
   videoCallsInitiated VideoCall[]    @relation("CallInitiator")
+  employeeProfile  EmployeeProfile?
+  checkIns         CheckInOut[]     @relation("UserCheckIns")
 
   @@index([orgId])
   @@index([phone])
@@ -238,9 +241,10 @@ model Department {
   sequence  Int     @default(0)
   isActive  Boolean @default(true)
 
-  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  manager      User?        @relation("DepartmentManager", fields: [managerId], references: [id])
+  organisation Organisation       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  manager      User?              @relation("DepartmentManager", fields: [managerId], references: [id])
   jobCards     JobCard[]
+  employees    EmployeeProfile[]
 
   @@index([orgId])
   @@index([orgId, sequence])
@@ -560,6 +564,42 @@ model Notification {
 }
 
 // ======================================================================
+// Factory direct employees
+// ======================================================================
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  PROBATION
+  INTERN
+}
+
+model EmployeeProfile {
+  id              String         @id @default(uuid())
+  userId          String         @unique
+  orgId           String
+  departmentId    String?
+  employmentType  EmploymentType @default(FULL_TIME)
+  designation     String
+  monthlySalary   BigInt         @default(0)  // paise
+  joiningDate     DateTime       @default(now())
+  exitDate        DateTime?
+  bankAccount     String?
+  ifscCode        String?
+  panNumber       String?
+  aadhaarLast4    String?
+  emergencyPhone  String?
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organisation Organisation  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  department   Department?   @relation(fields: [departmentId], references: [id])
+
+  @@index([orgId])
+  @@index([departmentId])
+  @@map("employee_profiles")
+}
+
+// ======================================================================
 // Sprint 1: File storage, Check-in/out, Inventory, Quality checks
 // ======================================================================
 
@@ -626,7 +666,8 @@ model FileAttachment {
 
 model CheckInOut {
   id           String    @id @default(uuid())
-  workerId     String
+  workerId     String?
+  userId       String?
   factoryOrgId String
   date         DateTime  @db.Date
   checkInTime  DateTime?
@@ -641,12 +682,13 @@ model CheckInOut {
   totalHours   Float?
   notes        String?
 
-  worker  Worker       @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  worker  Worker?      @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  user    User?        @relation("UserCheckIns", fields: [userId], references: [id], onDelete: Cascade)
   factory Organisation @relation("FactoryCheckIns", fields: [factoryOrgId], references: [id])
 
-  @@unique([workerId, date, shiftType])
   @@index([factoryOrgId, date])
   @@index([workerId, date])
+  @@index([userId, date])
   @@map("check_in_outs")
 }
 

@@ -217,8 +217,28 @@ export class OrdersService {
       data: { status: input.status },
     });
 
+    // --- Auto-triggers based on new status ---
+
+    if (input.status === OrderStatus.CONFIRMED) {
+      // Auto-generate job cards for every active department
+      const departments = await this.prisma.client.department.findMany({
+        where: { orgId, isActive: true },
+        orderBy: { sequence: 'asc' },
+      });
+      if (departments.length > 0) {
+        await this.prisma.client.jobCard.createMany({
+          data: departments.map((d) => ({
+            orderId: id,
+            departmentId: d.id,
+            orgId,
+            status: 'PENDING' as const,
+          })),
+        });
+      }
+    }
+
     if (input.status === OrderStatus.DISPATCHED) {
-      // Assume 18% GST default — in reality this would come from the order line items.
+      // Auto-accounting: sale + GST
       const gstPaise = (existing.totalValue * 18n) / 118n;
       await this.accounting.onOrderDispatched({
         orgId,
@@ -228,6 +248,39 @@ export class OrdersService {
         gstPaise,
         date: new Date(),
       });
+
+      // Auto-create invoice
+      const customer = await this.prisma.client.customer.findUnique({
+        where: { id: existing.customerId },
+      });
+      const invNumber = `INV-${existing.orderNumber.replace('ORD-', '')}`;
+      const netPaise = existing.totalValue - gstPaise;
+      try {
+        await this.prisma.client.invoice.create({
+          data: {
+            orgId,
+            orderId: id,
+            customerId: existing.customerId,
+            invoiceNumber: invNumber,
+            invoiceDate: new Date(),
+            dueDate: new Date(Date.now() + 30 * 86_400_000), // Net 30
+            items: [{
+              description: existing.productName,
+              quantity: existing.quantity,
+              unit: existing.unit,
+              unitPrice: Number(netPaise) / existing.quantity,
+              gstRate: 18,
+            }] as never,
+            subtotal: netPaise,
+            gstAmount: gstPaise,
+            totalAmount: existing.totalValue,
+            status: 'SENT',
+            createdBy: userId,
+          },
+        });
+      } catch {
+        // Invoice number conflict — skip if already created
+      }
     }
 
     // Real-time + notification
