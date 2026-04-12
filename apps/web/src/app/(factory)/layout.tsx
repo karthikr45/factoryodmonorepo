@@ -9,6 +9,7 @@ const nav = [
   { href: '/factory/procurement', label: 'Procurement' },
   { href: '/factory/quality', label: 'Quality' },
   { href: '/factory/transport', label: 'Transport' },
+  { href: '/factory/employees', label: 'Employees' },
   { href: '/factory/attendance', label: 'Attendance' },
   { href: '/factory/invoices', label: 'Invoices' },
   { href: '/factory/finance', label: 'Finance' },
