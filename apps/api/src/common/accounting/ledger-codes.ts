@@ -2,12 +2,11 @@
  * Chart of accounts seeded for every new FACTORY organisation.
  * Codes loosely follow the Indian standard chart. All amounts stored in paise.
  */
-import type { LedgerType } from '@repo/types';
 
 export interface LedgerSeed {
   code: string;
   name: string;
-  type: LedgerType;
+  type: string;
 }
 
 export const FACTORY_CHART_OF_ACCOUNTS: LedgerSeed[] = [

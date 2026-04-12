@@ -71,7 +71,7 @@ export class AccountingService {
       });
       if (!existing) {
         await this.prisma.client.ledger.create({
-          data: { ...ledger, orgId, isSystem: true },
+          data: { code: ledger.code, name: ledger.name, type: ledger.type as never, orgId, isSystem: true },
         });
         inserted++;
       }
@@ -120,7 +120,7 @@ export class AccountingService {
           createdAuto: true,
           financialYear: fy,
         },
-      ],
+      ] as never,
     });
 
     // Update customer outstanding.
@@ -172,7 +172,7 @@ export class AccountingService {
           createdAuto: true,
           financialYear: fy,
         },
-      ],
+      ] as never,
     });
   }
 
@@ -197,7 +197,7 @@ export class AccountingService {
         sourceId: null,
         createdAuto: true,
         financialYear: fy,
-      },
+      } as never,
     });
   }
 
@@ -212,7 +212,18 @@ export class AccountingService {
     const fy = this.financialYear(event.date);
     const label = `${event.month}/${event.year}`;
 
-    const entries = [
+    const entries: Array<{
+      orgId: string;
+      date: Date;
+      description: string;
+      debitLedger: string;
+      creditLedger: string;
+      amount: bigint;
+      sourceType: string;
+      sourceId: null;
+      createdAuto: boolean;
+      financialYear: string;
+    }> = [
       {
         orgId: event.orgId,
         date: event.date,
@@ -220,7 +231,7 @@ export class AccountingService {
         debitLedger: LEDGER.WAGES_PAYABLE,
         creditLedger: LEDGER.BANK,
         amount: event.netPaise,
-        sourceType: 'ATTENDANCE' as const,
+        sourceType: 'ATTENDANCE',
         sourceId: null,
         createdAuto: true,
         financialYear: fy,
@@ -234,7 +245,7 @@ export class AccountingService {
         debitLedger: LEDGER.WAGES_PAYABLE,
         creditLedger: LEDGER.EPF_PAYABLE,
         amount: event.epfPaise,
-        sourceType: 'ATTENDANCE' as const,
+        sourceType: 'ATTENDANCE',
         sourceId: null,
         createdAuto: true,
         financialYear: fy,
@@ -248,14 +259,14 @@ export class AccountingService {
         debitLedger: LEDGER.WAGES_PAYABLE,
         creditLedger: LEDGER.ESIC_PAYABLE,
         amount: event.esicPaise,
-        sourceType: 'ATTENDANCE' as const,
+        sourceType: 'ATTENDANCE',
         sourceId: null,
         createdAuto: true,
         financialYear: fy,
       });
     }
 
-    await this.prisma.client.journalEntry.createMany({ data: entries });
+    await this.prisma.client.journalEntry.createMany({ data: entries as never });
   }
 
   /**
@@ -277,7 +288,7 @@ export class AccountingService {
         sourceId: null,
         createdAuto: true,
         financialYear: fy,
-      },
+      } as never,
     });
   }
 

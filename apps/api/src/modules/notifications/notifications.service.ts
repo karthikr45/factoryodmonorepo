@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-
-import { NotificationType } from '@repo/types';
+import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
 
@@ -9,7 +8,7 @@ import { NotificationsGateway } from './notifications.gateway';
 interface NotifyUserInput {
   userId: string;
   orgId: string;
-  type: NotificationType;
+  type: string;
   title: string;
   body: string;
   metadata?: Record<string, unknown>;
@@ -17,7 +16,7 @@ interface NotifyUserInput {
 
 interface NotifyOrgInput {
   orgId: string;
-  type: NotificationType;
+  type: string;
   title: string;
   body: string;
   metadata?: Record<string, unknown>;
@@ -38,7 +37,7 @@ export class NotificationsService {
   ): Promise<
     Array<{
       id: string;
-      type: NotificationType;
+      type: string;
       title: string;
       body: string;
       isRead: boolean;
@@ -56,7 +55,7 @@ export class NotificationsService {
     });
     return rows.map((n) => ({
       id: n.id,
-      type: n.type as NotificationType,
+      type: n.type,
       title: n.title,
       body: n.body,
       isRead: n.isRead,
@@ -81,15 +80,19 @@ export class NotificationsService {
   }
 
   async notifyUser(input: NotifyUserInput): Promise<void> {
+    const meta = input.metadata
+      ? (input.metadata as Prisma.InputJsonValue)
+      : Prisma.JsonNull;
+
     const n = await this.prisma.client.notification.create({
       data: {
         userId: input.userId,
         orgId: input.orgId,
-        type: input.type,
+        type: input.type as never,
         title: input.title,
         body: input.body,
         channel: 'INAPP',
-        metadata: (input.metadata ?? null) as object | null,
+        metadata: meta,
         sentAt: new Date(),
       },
     });
@@ -112,15 +115,19 @@ export class NotificationsService {
     });
     if (users.length === 0) return;
 
+    const meta = input.metadata
+      ? (input.metadata as Prisma.InputJsonValue)
+      : Prisma.JsonNull;
+
     await this.prisma.client.notification.createMany({
       data: users.map((u) => ({
         userId: u.id,
         orgId: input.orgId,
-        type: input.type,
+        type: input.type as never,
         title: input.title,
         body: input.body,
         channel: 'INAPP' as const,
-        metadata: (input.metadata ?? null) as object | null,
+        metadata: meta,
         sentAt: new Date(),
       })),
     });

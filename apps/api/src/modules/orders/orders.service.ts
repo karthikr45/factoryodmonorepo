@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import type { OrderStatus as PrismaOrderStatus } from '@prisma/client';
 
 import { OrderStatus } from '@repo/types';
 import type {
@@ -53,7 +52,7 @@ export class OrdersService {
   ): Promise<{ data: OrderListItem[]; total: number }> {
     const where = {
       orgId,
-      ...(options.status ? { status: options.status as PrismaOrderStatus } : {}),
+      ...(options.status ? { status: options.status as never } : {}),
       ...(options.search
         ? {
             OR: [
