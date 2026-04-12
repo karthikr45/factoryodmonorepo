@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { LogoutButton } from './logout-button';
+
 interface NavItem {
   href: string;
   label: string;
@@ -12,10 +14,6 @@ interface PortalShellProps {
   children: React.ReactNode;
 }
 
-/**
- * Shared chrome for the factory, agency, and CA portals.
- * Placeholder sidebar + top bar. Replace with shadcn/ui components once auth is wired in.
- */
 export function PortalShell({ portalName, accent, nav, children }: PortalShellProps): JSX.Element {
   const accentBg = accent === 'brand' ? 'bg-brand-900' : 'bg-accent-600';
 
@@ -23,7 +21,9 @@ export function PortalShell({ portalName, accent, nav, children }: PortalShellPr
     <div className="flex min-h-screen bg-neutral-50">
       <aside className={`flex w-64 flex-col ${accentBg} text-white`}>
         <div className="border-b border-white/10 px-6 py-5">
-          <div className="text-xs uppercase tracking-wider text-white/60">FactoryOS</div>
+          <Link href="/" className="text-xs uppercase tracking-wider text-white/60 hover:text-white/80">
+            FactoryOS
+          </Link>
           <div className="mt-1 text-lg font-semibold">{portalName}</div>
         </div>
         <nav className="flex-1 space-y-1 p-4">
@@ -37,9 +37,11 @@ export function PortalShell({ portalName, accent, nav, children }: PortalShellPr
             </Link>
           ))}
         </nav>
-        <div className="border-t border-white/10 px-6 py-4 text-xs text-white/60">v0.1.0</div>
+        <div className="border-t border-white/10 p-4">
+          <LogoutButton />
+        </div>
       </aside>
-      <main className="flex-1 p-8">{children}</main>
+      <main className="flex-1 overflow-auto p-8">{children}</main>
     </div>
   );
 }
