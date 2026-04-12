@@ -39,8 +39,8 @@ export class CheckInService {
     const istHour = (now.getUTCHours() + 5 + Math.floor((now.getUTCMinutes() + 30) / 60)) % 24;
     const isLate = istHour >= this.SHIFT_START_HOUR + 1; // 1 hour grace
 
-    const existing = await this.prisma.client.checkInOut.findUnique({
-      where: { workerId_date_shiftType: { workerId: input.workerId, date: today, shiftType: shift } },
+    const existing = await this.prisma.client.checkInOut.findFirst({
+      where: { workerId: input.workerId, factoryOrgId, date: today },
     });
 
     if (existing?.checkInTime) {
@@ -123,12 +123,19 @@ export class CheckInService {
   }>> {
     const rows = await this.prisma.client.checkInOut.findMany({
       where: { factoryOrgId, date },
-      include: { worker: { select: { id: true, name: true, skill: true } } },
+      include: {
+        worker: { select: { id: true, name: true, skill: true } },
+        user: { select: { id: true, name: true } },
+      },
       orderBy: { checkInTime: 'asc' },
     });
     return rows.map((r) => ({
       id: r.id,
-      worker: r.worker,
+      worker: r.worker
+        ? r.worker
+        : r.user
+          ? { id: r.user.id, name: r.user.name, skill: 'Direct employee' }
+          : { id: '', name: 'Unknown', skill: '' },
       checkInTime: r.checkInTime,
       checkOutTime: r.checkOutTime,
       totalHours: r.totalHours,
