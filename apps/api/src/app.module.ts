@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
@@ -20,7 +22,14 @@ import { HealthController } from './health.controller';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: [
+        resolve(__dirname, '../../../.env'),  // repo root
+        resolve(__dirname, '../.env'),        // apps/api/.env (if exists)
+        '.env',
+      ],
+    }),
     ThrottlerModule.forRoot([
       { name: 'default', ttl: 60_000, limit: 100 },
       { name: 'otp', ttl: 60_000, limit: 5 },

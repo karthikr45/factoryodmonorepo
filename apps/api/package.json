@@ -5,9 +5,9 @@
   "description": "FactoryOS NestJS backend",
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build",
-    "dev": "nest start --watch",
-    "start": "node dist/main",
+    "build": "dotenv -e ../../.env -- nest build",
+    "dev": "dotenv -e ../../.env -- nest start --watch",
+    "start": "dotenv -e ../../.env -- node dist/main",
     "start:prod": "node dist/main",
     "lint": "eslint \"src/**/*.ts\" --max-warnings 0",
     "typecheck": "tsc --noEmit",
@@ -44,6 +44,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "dotenv-cli": "^7.4.2",
     "@nestjs/cli": "^10.4.5",
     "@nestjs/schematics": "^10.1.4",
     "@nestjs/testing": "^10.4.4",
