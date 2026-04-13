@@ -6,6 +6,7 @@ const nav = [
   { href: '/factory/people', label: 'People' },
   { href: '/factory/inventory', label: 'Inventory' },
   { href: '/factory/money', label: 'Money' },
+  { href: '/factory/workflows', label: 'Workflows' },
   { href: '/factory/settings', label: 'Settings' },
 ];
 
