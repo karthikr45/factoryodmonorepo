@@ -15,6 +15,7 @@ const nav = [
   { href: '/factory/finance', label: 'Finance' },
   { href: '/factory/chat', label: 'Chat' },
   { href: '/factory/reports', label: 'Reports' },
+  { href: '/factory/settings', label: 'Settings' },
 ];
 
 export default function FactoryLayout({

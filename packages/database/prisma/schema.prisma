@@ -22,6 +22,7 @@ enum OrganisationType {
   FACTORY
   AGENCY
   CA_FIRM
+  PLATFORM
 }
 
 enum OrganisationPlan {
@@ -30,10 +31,13 @@ enum OrganisationPlan {
 }
 
 enum UserRole {
+  SUPER_ADMIN
   OWNER
   MANAGER
+  ACCOUNTANT
   CA
   AGENCY_ADMIN
+  AGENCY_SUPERVISOR
   WORKER
 }
 
@@ -176,6 +180,9 @@ model Organisation {
   whatsappMessages  WhatsAppMessage[]
   videoCalls        VideoCall[]
   employeeProfiles  EmployeeProfile[]
+  relationshipsFrom OrgRelationship[] @relation("RelationshipFrom")
+  relationshipsTo   OrgRelationship[] @relation("RelationshipTo")
+  invitations       Invitation[]
 
   @@index([type])
   @@index([isActive])
@@ -213,6 +220,8 @@ model User {
   videoCallsInitiated VideoCall[]    @relation("CallInitiator")
   employeeProfile  EmployeeProfile?
   checkIns         CheckInOut[]     @relation("UserCheckIns")
+  invitedRelationships OrgRelationship[] @relation("RelationshipInviter")
+  invitationsSent  Invitation[]     @relation("InvitationInviter")
 
   @@index([orgId])
   @@index([phone])
@@ -1054,4 +1063,89 @@ model VideoCall {
 
   @@index([orgId, startedAt])
   @@map("video_calls")
+}
+
+// ======================================================================
+// Organisation relationships and invitations
+// ======================================================================
+
+enum OrgRelationshipType {
+  FACTORY_AGENCY    // Factory <-> Staffing Agency
+  FACTORY_CA        // Factory <-> CA Firm
+  FACTORY_CUSTOMER  // Factory <-> Customer (if the customer ever onboards)
+}
+
+enum OrgRelationshipStatus {
+  PENDING   // Invitation sent, awaiting acceptance
+  ACTIVE    // Both parties agreed
+  REJECTED
+  ENDED     // Previously active, now terminated
+}
+
+model OrgRelationship {
+  id         String                @id @default(uuid())
+  fromOrgId  String
+  toOrgId    String
+  type       OrgRelationshipType
+  status     OrgRelationshipStatus @default(PENDING)
+  invitedBy  String
+  acceptedAt DateTime?
+  endedAt    DateTime?
+  notes      String?
+  createdAt  DateTime              @default(now())
+
+  fromOrg Organisation @relation("RelationshipFrom", fields: [fromOrgId], references: [id], onDelete: Cascade)
+  toOrg   Organisation @relation("RelationshipTo", fields: [toOrgId], references: [id], onDelete: Cascade)
+  inviter User         @relation("RelationshipInviter", fields: [invitedBy], references: [id])
+
+  @@unique([fromOrgId, toOrgId, type])
+  @@index([fromOrgId, status])
+  @@index([toOrgId, status])
+  @@map("org_relationships")
+}
+
+enum InvitationType {
+  TEAM_MEMBER      // Invite a colleague to join your org
+  ORG_RELATIONSHIP // Invite another business (CA, agency) to connect
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+model Invitation {
+  id           String           @id @default(uuid())
+  orgId        String
+  invitedBy    String
+  type         InvitationType
+  status       InvitationStatus @default(PENDING)
+  token        String           @unique @default(uuid())
+
+  // For TEAM_MEMBER:
+  inviteePhone String?
+  inviteeName  String?
+  inviteeRole  UserRole?
+
+  // For ORG_RELATIONSHIP:
+  targetOrgType  OrganisationType?
+  targetOrgName  String?
+  targetGstin    String?
+  targetPhone    String?
+  relationshipType OrgRelationshipType?
+
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  acceptedBy   String?
+  createdAt    DateTime         @default(now())
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  inviter      User         @relation("InvitationInviter", fields: [invitedBy], references: [id])
+
+  @@index([orgId, status])
+  @@index([inviteePhone])
+  @@index([token])
+  @@map("invitations")
 }

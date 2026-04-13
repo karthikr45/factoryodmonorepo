@@ -16,6 +16,7 @@ import { ComplianceModule } from './modules/compliance/compliance.module';
 import { FilesModule } from './modules/files/files.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
+import { InvitationsModule } from './modules/invitations/invitations.module';
 import { InvoicesModule } from './modules/invoices/invoices.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { OrdersModule } from './modules/orders/orders.module';
@@ -24,7 +25,9 @@ import { ProcurementModule } from './modules/procurement/procurement.module';
 import { ProductionModule } from './modules/production/production.module';
 import { QualityCheckModule } from './modules/quality-check/quality-check.module';
 import { QuotationsModule } from './modules/quotations/quotations.module';
+import { RelationshipsModule } from './modules/relationships/relationships.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { TransportModule } from './modules/transport/transport.module';
 import { VideoCallsModule } from './modules/video-calls/video-calls.module';
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
@@ -53,6 +56,9 @@ import { HealthController } from './health.controller';
     // Auth & Org
     AuthModule,
     OrganisationsModule,
+    InvitationsModule,
+    RelationshipsModule,
+    SuperAdminModule,
 
     // Core operations
     OrdersModule,

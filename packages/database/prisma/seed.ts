@@ -21,6 +21,28 @@ async function main(): Promise<void> {
   console.info('Seeding FactoryOS...');
 
   // ================================================================
+  // Platform org + Super admin
+  // ================================================================
+  const platform = await prisma.organisation.upsert({
+    where: { gstin: 'PLATFORM' },
+    update: {},
+    create: {
+      name: 'FactoryOS Platform', gstin: 'PLATFORM',
+      type: 'PLATFORM', plan: 'PRO', isActive: true,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { phone: '+919999999999' },
+    update: {},
+    create: {
+      orgId: platform.id, name: 'Platform Admin',
+      phone: '+919999999999', email: 'admin@factoryos.in',
+      role: 'SUPER_ADMIN',
+    },
+  });
+
+  // ================================================================
   // Organisations
   // ================================================================
   const factory = await prisma.organisation.upsert({
@@ -615,9 +637,38 @@ async function main(): Promise<void> {
     });
   }
 
+  // ================================================================
+  // Organisation relationships (Factory <-> CA, Factory <-> Agency)
+  // ================================================================
+  const relFactoryCa = await prisma.orgRelationship.findFirst({
+    where: { fromOrgId: factory.id, toOrgId: caFirm.id, type: 'FACTORY_CA' },
+  });
+  if (!relFactoryCa) {
+    await prisma.orgRelationship.create({
+      data: {
+        fromOrgId: factory.id, toOrgId: caFirm.id,
+        type: 'FACTORY_CA', status: 'ACTIVE',
+        invitedBy: owner.id, acceptedAt: daysAgo(30),
+      },
+    });
+  }
+  const relFactoryAgency = await prisma.orgRelationship.findFirst({
+    where: { fromOrgId: factory.id, toOrgId: agency.id, type: 'FACTORY_AGENCY' },
+  });
+  if (!relFactoryAgency) {
+    await prisma.orgRelationship.create({
+      data: {
+        fromOrgId: factory.id, toOrgId: agency.id,
+        type: 'FACTORY_AGENCY', status: 'ACTIVE',
+        invitedBy: owner.id, acceptedAt: daysAgo(60),
+      },
+    });
+  }
+
   console.info('Seed complete!');
   console.info('');
   console.info('Demo logins:');
+  console.info('  Super Admin:    +919999999999  (Platform Admin)');
   console.info('  Factory Owner:  +919876543210  (Ravi Kumar)');
   console.info('  Agency Admin:   +919876543211  (Suresh Naidu)');
   console.info('  CA / Auditor:   +919876543212  (Lakshmi Reddy)');

@@ -92,12 +92,19 @@ export async function verifyOtpAction(formData: FormData): Promise<ActionResult>
 
   // Route by role
   switch (result.user.role) {
+    case 'SUPER_ADMIN':
+      redirect('/admin');
     case 'AGENCY_ADMIN':
+    case 'AGENCY_SUPERVISOR':
       redirect('/agency');
     case 'CA':
       redirect('/ca');
+    case 'WORKER':
+      // Workers use the mobile app; on web they see their profile
+      redirect('/factory');
     case 'OWNER':
     case 'MANAGER':
+    case 'ACCOUNTANT':
     default:
       redirect('/factory');
   }

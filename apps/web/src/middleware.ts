@@ -16,6 +16,7 @@ export function middleware(req: NextRequest): NextResponse {
     pathname.startsWith('/factory') ||
     pathname.startsWith('/agency') ||
     pathname.startsWith('/ca') ||
+    pathname.startsWith('/admin') ||
     pathname.startsWith('/onboarding');
 
   if (!needsAuth) return NextResponse.next();
@@ -30,5 +31,5 @@ export function middleware(req: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ['/factory/:path*', '/agency/:path*', '/ca/:path*', '/onboarding'],
+  matcher: ['/factory/:path*', '/agency/:path*', '/ca/:path*', '/admin/:path*', '/onboarding'],
 };
