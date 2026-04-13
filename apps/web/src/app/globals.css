@@ -4,17 +4,17 @@
 
 @layer base {
   :root {
-    /* Neptune palette → HSL */
+    /* Amethyst Mint Harmony palette → HSL */
     --background: 0 0% 100%;
-    --foreground: 231 54% 22%;            /* brand-900 #1A1F5C */
+    --foreground: 300 33% 12%;            /* brand-900 #2A152A */
     --card: 0 0% 100%;
-    --card-foreground: 231 54% 22%;
-    --primary: 236 100% 66%;              /* brand-600 #525AFF */
+    --card-foreground: 300 33% 12%;
+    --primary: 303 30% 26%;               /* brand-600 #562F54 */
     --primary-foreground: 0 0% 100%;
-    --muted: 221 65% 97%;                 /* brand-50 #F3F6FC */
-    --muted-foreground: 215 30% 50%;
-    --border: 221 60% 90%;                /* brand-100ish */
-    --ring: 236 100% 66%;
+    --muted: 315 36% 96%;                 /* brand-50 */
+    --muted-foreground: 303 20% 45%;
+    --border: 315 30% 90%;                /* brand-100 */
+    --ring: 303 30% 26%;
     --radius: 0.5rem;
   }
 

@@ -1,41 +1,52 @@
 /**
- * FactoryOS design tokens — Neptune palette.
- * Shared between web (Tailwind) and mobile (NativeWind).
+ * FactoryOS design tokens — Amethyst Mint Harmony palette.
  *
  * Source palette:
- *   #8FD9FB — sky blue
- *   #4AB5B5 — teal
- *   #6D8BC0 — slate blue
- *   #525AFF — vivid indigo (primary)
+ *   #562F54 — deep eggplant purple (primary brand)
+ *   #8DF688 — mint green (accent)
+ *   #2A3F38 — dark forest green
+ *   #57585D — steel grey
+ *   #F650BD — neon pink (highlight)
  */
 
 export const colors = {
-  // Brand — cool, modern indigo/slate palette
+  // Brand — purple (eggplant) scale
   brand: {
-    50: '#F3F6FC',
-    100: '#E5EBF8',
-    200: '#D0DAF0',
-    300: '#B0C2E0',
-    400: '#8CA5D0',
-    500: '#6D8BC0',   // slate blue (from palette)
-    600: '#525AFF',   // vivid indigo (from palette)
-    700: '#3844D0',
-    800: '#2C3499',
-    900: '#1A1F5C',
-    950: '#0A0D33',
+    50: '#F8F1F7',
+    100: '#EFE0ED',
+    200: '#DDC0D9',
+    300: '#C299BD',
+    400: '#A3749E',
+    500: '#80567D',
+    600: '#562F54',   // main (from palette)
+    700: '#472547',
+    800: '#361B37',
+    900: '#2A152A',
+    950: '#1A0D1A',
   },
-  // Accent — cool teal + sky
+  // Accent — mint green scale
   accent: {
-    50: '#F0FBFF',
-    100: '#D8EFFE',
-    200: '#B8E5FD',
-    300: '#8FD9FB',   // sky blue (from palette)
-    400: '#6FCACA',
-    500: '#4AB5B5',   // teal (from palette)
-    600: '#3A9999',
-    700: '#2F7878',
-    800: '#245959',
-    900: '#193F3F',
+    50: '#F3FEF2',
+    100: '#E1FCDE',
+    200: '#C2F9BC',
+    300: '#8DF688',   // main (from palette)
+    400: '#5DE857',
+    500: '#38CC32',
+    600: '#2AA525',
+    700: '#23851F',
+    800: '#1E6A1B',
+    900: '#1A5618',
+  },
+  // Highlight — neon pink (use sparingly for special CTAs)
+  highlight: {
+    50: '#FEF0F9',
+    100: '#FDDBF1',
+    200: '#FBB7E3',
+    300: '#F88FD2',
+    400: '#F650BD',   // main (from palette)
+    500: '#D82EA0',
+    600: '#A92179',
+    700: '#7E1A5B',
   },
   // Semantic
   success: {
@@ -61,7 +72,7 @@ export const colors = {
     600: '#dc2626',
     700: '#b91c1c',
   },
-  // Neutrals
+  // Neutrals — slightly warmed to harmonize with palette
   neutral: {
     0: '#ffffff',
     50: '#fafafa',
