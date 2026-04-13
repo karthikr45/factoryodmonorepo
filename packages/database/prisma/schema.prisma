@@ -183,6 +183,11 @@ model Organisation {
   relationshipsFrom OrgRelationship[] @relation("RelationshipFrom")
   relationshipsTo   OrgRelationship[] @relation("RelationshipTo")
   invitations       Invitation[]
+  workflowTemplates WorkflowTemplate[]
+  customRoles       CustomRole[]
+  approvalRules     ApprovalRule[]
+  approvalRequests  ApprovalRequest[]
+  aiInteractions    AIInteraction[]
 
   @@index([type])
   @@index([isActive])
@@ -222,6 +227,8 @@ model User {
   checkIns         CheckInOut[]     @relation("UserCheckIns")
   invitedRelationships OrgRelationship[] @relation("RelationshipInviter")
   invitationsSent  Invitation[]     @relation("InvitationInviter")
+  workflowsCreated WorkflowTemplate[] @relation("WorkflowTemplateCreator")
+  approvalsRequested ApprovalRequest[] @relation("ApprovalRequester")
 
   @@index([orgId])
   @@index([phone])
@@ -273,6 +280,8 @@ model Order {
   totalValue   BigInt      // paise
   advancePaid  BigInt      @default(0) // paise
   notes        String?
+  workflowTemplateId String?
+  workflowSnapshot   Json?    // Captured stage list at order creation
   createdBy    String
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
@@ -280,6 +289,7 @@ model Order {
   organisation Organisation    @relation(fields: [orgId], references: [id], onDelete: Cascade)
   customer     Customer        @relation(fields: [customerId], references: [id])
   creator      User            @relation("OrderCreatedBy", fields: [createdBy], references: [id])
+  workflowTemplate WorkflowTemplate? @relation("OrderWorkflowTemplate", fields: [workflowTemplateId], references: [id])
   jobCards     JobCard[]
   qualityChecks QualityCheck[]
   dispatches   Dispatch[]
@@ -1148,4 +1158,256 @@ model Invitation {
   @@index([inviteePhone])
   @@index([token])
   @@map("invitations")
+}
+
+// ======================================================================
+// Sprint 1: Workflow templates + approval matrix + custom roles + waitlist
+// ======================================================================
+
+enum WorkflowIndustry {
+  TEXTILE
+  AUTO_COMPONENTS
+  PHARMA
+  FOOD_PROCESSING
+  JOB_WORK
+  PACKAGING
+  ELECTRONICS
+  GENERAL
+  CUSTOM
+}
+
+enum StageAutoAdvance {
+  ALWAYS          // move to next stage when this one completes
+  ON_QC_PASS      // only if QC passes
+  MANUAL          // require user action
+}
+
+model WorkflowTemplate {
+  id           String            @id @default(uuid())
+  orgId        String
+  name         String
+  description  String?
+  industry     WorkflowIndustry  @default(GENERAL)
+  isDefault    Boolean           @default(false)  // default workflow if admin doesn't pick
+  isPublished  Boolean           @default(false)  // visible in community template library
+  icon         String?
+  createdBy    String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  organisation Organisation     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  creator      User             @relation("WorkflowTemplateCreator", fields: [createdBy], references: [id])
+  stages       WorkflowStage[]
+  ordersUsing  Order[]          @relation("OrderWorkflowTemplate")
+
+  @@index([orgId])
+  @@index([industry, isPublished])
+  @@map("workflow_templates")
+}
+
+model WorkflowStage {
+  id                String           @id @default(uuid())
+  templateId        String
+  name              String
+  description       String?
+  icon              String?          // emoji
+  color             String?
+  sequence          Int              // ordering
+  parallelGroupId   String?          // stages with same group run in parallel
+  assignedRoleId    String?          // CustomRole id, or null for anyone
+  slaHours          Float?           // expected duration
+  qcRequired        Boolean          @default(false)
+  qcChecklist       Json?            // array of {parameter, expected, passCriteria}
+  isOutsourced      Boolean          @default(false)
+  autoAdvance       StageAutoAdvance @default(ALWAYS)
+  requiredInputs    Json?            // {materials, documents, tools}
+  outputChecklist   Json?            // array of strings to tick
+  approvalRuleId    String?          // rule triggered on stage completion
+  notes             String?
+
+  template       WorkflowTemplate     @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  transitionsFrom WorkflowTransition[] @relation("TransitionFrom")
+  transitionsTo   WorkflowTransition[] @relation("TransitionTo")
+
+  @@index([templateId, sequence])
+  @@map("workflow_stages")
+}
+
+enum TransitionCondition {
+  ALWAYS
+  ON_QC_PASS
+  ON_QC_FAIL
+  ON_REWORK
+  CONDITIONAL
+}
+
+model WorkflowTransition {
+  id         String              @id @default(uuid())
+  fromStageId String
+  toStageId   String
+  condition   TransitionCondition @default(ALWAYS)
+  conditionExpr String?           // JSON expression for CONDITIONAL
+
+  fromStage WorkflowStage @relation("TransitionFrom", fields: [fromStageId], references: [id], onDelete: Cascade)
+  toStage   WorkflowStage @relation("TransitionTo", fields: [toStageId], references: [id], onDelete: Cascade)
+
+  @@index([fromStageId])
+  @@map("workflow_transitions")
+}
+
+// ---- Custom roles ----
+
+model CustomRole {
+  id          String   @id @default(uuid())
+  orgId       String
+  name        String   // "Batch Release Officer", "Lamination Supervisor"
+  description String?
+  permissions Json     @default("[]") // array of permission keys
+  isSystem    Boolean  @default(false) // OWNER, MANAGER etc. cannot be deleted
+  icon        String?
+  color       String?
+  createdAt   DateTime @default(now())
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, name])
+  @@index([orgId])
+  @@map("custom_roles")
+}
+
+// ---- Approval matrix ----
+
+enum ApprovalTriggerType {
+  OVERTIME
+  LEAVE
+  PURCHASE_ORDER
+  PAYMENT_OUT
+  QC_REJECTION
+  STOCK_ISSUE
+  VENDOR_ONBOARDING
+  CUSTOMER_CREDIT
+  DISCOUNT
+  STAGE_COMPLETION
+  ORDER_DISPATCH
+  CUSTOM
+}
+
+enum ApprovalOperator {
+  GT   // greater than
+  GTE
+  LT
+  LTE
+  EQ
+  NEQ
+  ANY  // no condition
+}
+
+enum ApprovalType {
+  SEQUENTIAL // approve in order
+  PARALLEL   // all at once
+  ANY        // any one is enough
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+model ApprovalRule {
+  id              String              @id @default(uuid())
+  orgId           String
+  name            String              // "Overtime > 2 hours"
+  triggerType     ApprovalTriggerType
+  conditionField  String?             // "hours", "amount"
+  conditionOp     ApprovalOperator    @default(ANY)
+  conditionValue  Float?
+  approverRoleIds Json                @default("[]") // CustomRole ids
+  approvalType    ApprovalType        @default(SEQUENTIAL)
+  slaHours        Float?              // auto-escalate after X hours
+  isActive        Boolean             @default(true)
+  priority        Int                 @default(100) // lower = higher precedence
+  createdAt       DateTime            @default(now())
+
+  organisation  Organisation      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  requests      ApprovalRequest[]
+
+  @@index([orgId, triggerType, isActive])
+  @@map("approval_rules")
+}
+
+model ApprovalRequest {
+  id            String              @id @default(uuid())
+  orgId         String
+  ruleId        String
+  triggerType   ApprovalTriggerType
+  subjectType   String              // "ORDER", "ATTENDANCE", "PO", "PAYMENT"
+  subjectId     String
+  requestedBy   String
+  status        ApprovalStatus      @default(PENDING)
+  currentLevel  Int                 @default(0)
+  approvals     Json                @default("[]") // [{approverId, level, action, at, notes}]
+  metadata      Json?
+  expiresAt     DateTime?
+  createdAt     DateTime            @default(now())
+  resolvedAt    DateTime?
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  rule         ApprovalRule @relation(fields: [ruleId], references: [id])
+  requester    User         @relation("ApprovalRequester", fields: [requestedBy], references: [id])
+
+  @@index([orgId, status])
+  @@index([subjectType, subjectId])
+  @@map("approval_requests")
+}
+
+// ---- Waitlist (pre-launch) ----
+
+model WaitlistEntry {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  phone        String?
+  businessName String?
+  vertical     String?
+  workerCount  String?   // "1-10", "10-50", "50-200", "200+"
+  state        String?
+  source       String?   // "landing", "product_hunt", "ad_campaign_X"
+  invitedAt    DateTime?
+  convertedAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([createdAt])
+  @@map("waitlist_entries")
+}
+
+// ---- AI interactions log ----
+
+enum AIInteractionType {
+  WORKFLOW_GENERATION
+  ANOMALY_DETECTION
+  NATURAL_LANGUAGE_QUERY
+  WORKFLOW_OPTIMIZATION
+  DOCUMENT_PARSING
+  DAILY_DIGEST
+}
+
+model AIInteraction {
+  id         String            @id @default(uuid())
+  orgId      String
+  userId     String?
+  type       AIInteractionType
+  prompt     String
+  response   String
+  metadata   Json?
+  tokensIn   Int?
+  tokensOut  Int?
+  model      String?
+  createdAt  DateTime          @default(now())
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, type, createdAt])
+  @@map("ai_interactions")
 }

@@ -7,12 +7,14 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AccountingModule } from './common/accounting/accounting.module';
 import { PrismaModule } from './common/prisma/prisma.module';
+import { ApprovalsModule } from './modules/approvals/approvals.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BomModule } from './modules/bom/bom.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { CheckInModule } from './modules/check-in/check-in.module';
 import { ComplianceModule } from './modules/compliance/compliance.module';
+import { CustomRolesModule } from './modules/custom-roles/custom-roles.module';
 import { FilesModule } from './modules/files/files.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
@@ -30,8 +32,10 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { TransportModule } from './modules/transport/transport.module';
 import { VideoCallsModule } from './modules/video-calls/video-calls.module';
+import { WaitlistModule } from './modules/waitlist/waitlist.module';
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
 import { WorkersModule } from './modules/workers/workers.module';
+import { WorkflowsModule } from './modules/workflows/workflows.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -87,6 +91,12 @@ import { HealthController } from './health.controller';
 
     // Sprint 5: Video calls
     VideoCallsModule,
+
+    // Workflow engine + governance (Option B-1)
+    WorkflowsModule,
+    CustomRolesModule,
+    ApprovalsModule,
+    WaitlistModule,
 
     // Finance, Compliance, Reports, Notifications
     FinanceModule,

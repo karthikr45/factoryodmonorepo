@@ -6,6 +6,7 @@ import { FAQSection } from '@/components/faq-section';
 import { LiveDemoSection } from '@/components/live-demo-section';
 import { StatsMarquee } from '@/components/stats-marquee';
 import { TestimonialsSection } from '@/components/testimonials-section';
+import { WaitlistForm } from '@/components/waitlist-form';
 import { WatchFlowButton } from '@/components/watch-flow-button';
 
 const JOURNEY_FACTORY = [
@@ -383,6 +384,32 @@ export default function LandingPage(): JSX.Element {
                 Upgrade to Pro
               </Link>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Waitlist */}
+      <section id="waitlist" className="relative overflow-hidden py-24">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-brand-50 via-white to-accent-50" />
+        <div className="pointer-events-none absolute -top-20 -left-20 h-96 w-96 animate-blob rounded-full bg-highlight-400/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 -right-20 h-96 w-96 animate-blob rounded-full bg-accent-300/10 blur-3xl [animation-delay:3s]" />
+
+        <div className="relative mx-auto max-w-3xl px-6">
+          <div className="text-center">
+            <div className="inline-block rounded-full bg-highlight-400 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-highlight-400/30">
+              Launching in 10 weeks
+            </div>
+            <h2 className="mt-4 text-4xl font-bold text-brand-900 sm:text-5xl">
+              Reserve your spot on the waitlist
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-lg text-neutral-600">
+              Factory owners, staffing agencies, and CAs on the waitlist get early access,
+              founder pricing forever, and priority onboarding support.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-10 max-w-xl rounded-2xl border border-neutral-200 bg-white p-8 shadow-xl shadow-brand-600/10">
+            <WaitlistForm />
           </div>
         </div>
       </section>
