@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { AnimatedDashboard } from '@/components/animated-dashboard';
+
 const JOURNEY_FACTORY = [
   { step: '1', title: 'Sign up in 60 seconds', desc: 'Enter your phone, verify OTP. No credit card.' },
   { step: '2', title: 'Set up your factory', desc: 'We auto-create your departments, chart of accounts, and default workflows.' },
@@ -51,46 +53,85 @@ export default function LandingPage(): JSX.Element {
       </nav>
 
       {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-brand-900 via-brand-800 to-brand-950 py-24 text-white sm:py-32">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.08),transparent_60%)]" />
-        <div className="relative mx-auto max-w-5xl px-6 text-center">
-          <div className="inline-block rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-medium tracking-wide text-white/90">
-            India&apos;s operating system for manufacturing businesses
+      <section className="relative overflow-hidden bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 pt-20 pb-32 text-white sm:pt-28 sm:pb-40">
+        {/* Animated mesh gradient */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(246,80,189,0.15),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,rgba(141,246,136,0.1),transparent_50%)]" />
+
+        {/* Floating blobs */}
+        <div className="pointer-events-none absolute -top-20 -left-20 h-96 w-96 animate-blob rounded-full bg-highlight-400/20 mix-blend-screen blur-3xl" />
+        <div className="pointer-events-none absolute top-1/2 -right-20 h-96 w-96 animate-blob rounded-full bg-accent-300/20 mix-blend-screen blur-3xl [animation-delay:3s]" />
+
+        {/* Grid overlay */}
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage:
+              'linear-gradient(white 1px, transparent 1px), linear-gradient(90deg, white 1px, transparent 1px)',
+            backgroundSize: '60px 60px',
+          }}
+        />
+
+        <div className="relative mx-auto max-w-6xl px-6">
+          <div className="text-center">
+            <div className="inline-flex animate-fade-in-down items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-medium tracking-wide text-white/90 backdrop-blur">
+              <span className="flex h-2 w-2 rounded-full bg-accent-300">
+                <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-accent-300 opacity-75" />
+              </span>
+              India&apos;s operating system for manufacturing businesses
+            </div>
+            <h1 className="mt-8 animate-fade-in-up text-4xl font-extrabold leading-[1.1] tracking-tight sm:text-6xl md:text-7xl">
+              One platform.
+              <br />
+              <span className="bg-gradient-to-r from-accent-300 via-highlight-300 to-accent-300 bg-[length:200%_auto] bg-clip-text text-transparent animate-gradient-shift">
+                Factory, Agency, CA — connected.
+              </span>
+            </h1>
+            <p className="mx-auto mt-6 max-w-3xl animate-fade-in-up text-lg leading-relaxed text-white/80 [animation-delay:150ms] sm:text-xl">
+              Every business operation automatically creates an accounting entry. No manual
+              bookkeeping. No WhatsApp chaos. No 30-day-stale Tally files.
+            </p>
+            <div className="mt-10 flex animate-fade-in-up flex-wrap justify-center gap-4 [animation-delay:300ms]">
+              <Link
+                href="/signup"
+                className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-highlight-400 to-brand-600 px-8 py-4 text-base font-semibold text-white shadow-xl shadow-highlight-400/30 transition-all hover:shadow-2xl hover:shadow-highlight-400/50"
+              >
+                <span className="relative z-10 flex items-center gap-2">
+                  Start free — 60 seconds
+                  <svg className="h-4 w-4 transition-transform group-hover:translate-x-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </span>
+                <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+              </Link>
+              <a
+                href="#how"
+                className="rounded-xl border border-white/20 bg-white/5 px-8 py-4 text-base font-semibold text-white backdrop-blur transition hover:border-white/40 hover:bg-white/10"
+              >
+                ▶ Watch the flow
+              </a>
+            </div>
+            <div className="mt-10 flex animate-fade-in flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-white/50 [animation-delay:500ms]">
+              <span className="flex items-center gap-1.5">
+                <span className="text-success-500">✓</span> No credit card
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="text-success-500">✓</span> Free plan available
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="text-success-500">✓</span> GST compliant
+              </span>
+            </div>
           </div>
-          <h1 className="mt-8 text-4xl font-extrabold leading-tight tracking-tight sm:text-6xl">
-            One platform.
-            <br />
-            <span className="text-accent-400">Factory, Agency, and CA — connected.</span>
-          </h1>
-          <p className="mx-auto mt-6 max-w-3xl text-lg leading-relaxed text-white/80">
-            Stop running your factory on WhatsApp, diaries, and Tally files. FactoryOS connects
-            factory owners, staffing agencies, and chartered accountants on one platform — where
-            every business operation automatically creates an accounting entry. Your books write
-            themselves.
-          </p>
-          <div className="mt-10 flex flex-wrap justify-center gap-4">
-            <Link href="/signup" className="rounded-lg bg-accent-500 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-accent-500/25 transition hover:bg-accent-600">
-              Start free — 60 seconds
-            </Link>
-            <a href="#factory" className="rounded-lg border border-white/20 bg-white/5 px-8 py-3.5 text-base font-semibold text-white transition hover:bg-white/10">
-              See how it works
-            </a>
-          </div>
-          <div className="mt-16 grid grid-cols-3 gap-8 text-center">
-            <div>
-              <div className="text-3xl font-bold text-accent-400">3-in-1</div>
-              <div className="mt-1 text-sm text-white/60">Factory + Agency + CA portals</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-accent-400">0</div>
-              <div className="mt-1 text-sm text-white/60">Manual bookkeeping entries</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-accent-400">Live</div>
-              <div className="mt-1 text-sm text-white/60">Trial balance, always current</div>
-            </div>
+
+          {/* Dashboard preview */}
+          <div className="mt-16 animate-fade-in-up [animation-delay:600ms]">
+            <AnimatedDashboard />
           </div>
         </div>
+
+        {/* Bottom fade */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-brand-950 to-transparent" />
       </section>
 
       {/* Problem */}
