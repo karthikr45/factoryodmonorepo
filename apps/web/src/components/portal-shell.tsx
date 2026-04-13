@@ -39,6 +39,14 @@ export function PortalShell({ portalName, accent, nav, children }: PortalShellPr
         </nav>
         <div className="border-t border-white/10 p-4">
           <LogoutButton />
+          <a
+            href="https://mktechmonk.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 block px-3 text-center text-xs text-white/40 hover:text-white/70"
+          >
+            Powered by <span className="font-semibold text-white/70">MK Tech Monk</span>
+          </a>
         </div>
       </aside>
       <main className="flex-1 overflow-auto p-8">{children}</main>

@@ -20,6 +20,11 @@ export default async function OnboardingPage(): Promise<JSX.Element> {
         </p>
         <OnboardingForm />
       </div>
+      <div className="mt-6 text-center text-xs text-neutral-500">
+        <a href="https://mktechmonk.com" target="_blank" rel="noopener noreferrer" className="hover:text-brand-700">
+          Powered by <span className="font-semibold text-brand-800">MK Tech Monk</span>
+        </a>
+      </div>
     </main>
   );
 }

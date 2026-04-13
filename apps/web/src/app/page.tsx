@@ -346,18 +346,30 @@ export default function LandingPage(): JSX.Element {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-neutral-100 bg-white py-10">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 text-sm text-neutral-500">
-          <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded bg-brand-900 text-xs font-bold text-white">F</div>
-            <span className="font-semibold text-brand-900">FactoryOS</span>
+      <footer className="border-t border-neutral-100 bg-white">
+        <div className="mx-auto max-w-6xl px-6 py-10">
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div className="max-w-sm">
+              <div className="flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded bg-brand-900 text-xs font-bold text-white">F</div>
+                <span className="font-semibold text-brand-900">FactoryOS</span>
+              </div>
+              <p className="mt-3 text-sm text-neutral-600">
+                Built for Indian manufacturing. All amounts in INR. GST compliant.
+              </p>
+            </div>
+            <div className="flex gap-6 text-sm text-neutral-500">
+              <Link href="/login" className="hover:text-brand-900">Sign in</Link>
+              <Link href="/signup" className="hover:text-brand-900">Sign up</Link>
+              <a href="#pricing" className="hover:text-brand-900">Pricing</a>
+            </div>
           </div>
-          <div className="flex gap-6">
-            <Link href="/login" className="hover:text-brand-900">Sign in</Link>
-            <Link href="/signup" className="hover:text-brand-900">Sign up</Link>
-            <a href="#pricing" className="hover:text-brand-900">Pricing</a>
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 pt-6 text-xs text-neutral-500">
+            <span>&copy; {new Date().getFullYear()} FactoryOS. All rights reserved.</span>
+            <a href="https://mktechmonk.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 font-medium text-neutral-600 transition hover:text-brand-700">
+              Powered by <span className="font-bold text-brand-800">MK Tech Monk</span>
+            </a>
           </div>
-          <p>Built for Indian manufacturing. All amounts in INR. GST compliant.</p>
         </div>
       </footer>
     </main>
