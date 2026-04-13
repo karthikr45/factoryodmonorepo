@@ -7,6 +7,8 @@ const nav = [
   { href: '/factory/inventory', label: 'Inventory' },
   { href: '/factory/money', label: 'Money' },
   { href: '/factory/workflows', label: 'Workflows' },
+  { href: '/factory/roles', label: 'Roles' },
+  { href: '/factory/approvals', label: 'Approvals' },
   { href: '/factory/settings', label: 'Settings' },
 ];
 
