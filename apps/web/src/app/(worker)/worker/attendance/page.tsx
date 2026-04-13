@@ -48,7 +48,7 @@ export default function WorkerAttendancePage(): JSX.Element {
   const isCurrentMonth = month === now.getMonth() + 1 && year === now.getFullYear();
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-brand-900">My attendance</h1>
         <p className="mt-1 text-sm text-neutral-600">Your check-in history and monthly totals</p>

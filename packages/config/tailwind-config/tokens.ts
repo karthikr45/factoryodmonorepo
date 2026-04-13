@@ -1,51 +1,62 @@
 /**
- * FactoryOS design tokens.
+ * FactoryOS design tokens — Neptune palette.
  * Shared between web (Tailwind) and mobile (NativeWind).
+ *
+ * Source palette:
+ *   #8FD9FB — sky blue
+ *   #4AB5B5 — teal
+ *   #6D8BC0 — slate blue
+ *   #525AFF — vivid indigo (primary)
  */
 
 export const colors = {
-  // Brand — trustworthy navy for CA/finance, with warm industrial accent
+  // Brand — cool, modern indigo/slate palette
   brand: {
-    50: '#f0f4fa',
-    100: '#dce5f2',
-    200: '#b9cce5',
-    300: '#8aa9d0',
-    400: '#5a81b7',
-    500: '#3a5f99',
-    600: '#2c497a',
-    700: '#243a61',
-    800: '#1d2e4e',
-    900: '#162540',
-    950: '#0d1628',
+    50: '#F3F6FC',
+    100: '#E5EBF8',
+    200: '#D0DAF0',
+    300: '#B0C2E0',
+    400: '#8CA5D0',
+    500: '#6D8BC0',   // slate blue (from palette)
+    600: '#525AFF',   // vivid indigo (from palette)
+    700: '#3844D0',
+    800: '#2C3499',
+    900: '#1A1F5C',
+    950: '#0A0D33',
   },
-  // Accent — warm saffron for CTAs, reflecting Indian identity
+  // Accent — cool teal + sky
   accent: {
-    50: '#fff8eb',
-    100: '#ffeac6',
-    200: '#ffd488',
-    300: '#ffb84a',
-    400: '#ff9a1f',
-    500: '#f57906',
-    600: '#d85a02',
-    700: '#b34207',
-    800: '#91340d',
-    900: '#772c0e',
+    50: '#F0FBFF',
+    100: '#D8EFFE',
+    200: '#B8E5FD',
+    300: '#8FD9FB',   // sky blue (from palette)
+    400: '#6FCACA',
+    500: '#4AB5B5',   // teal (from palette)
+    600: '#3A9999',
+    700: '#2F7878',
+    800: '#245959',
+    900: '#193F3F',
   },
   // Semantic
   success: {
     50: '#f0fdf4',
+    200: '#bbf7d0',
     500: '#22c55e',
     600: '#16a34a',
     700: '#15803d',
   },
   warning: {
     50: '#fffbeb',
+    200: '#fde68a',
     500: '#f59e0b',
     600: '#d97706',
     700: '#b45309',
+    800: '#92400e',
+    900: '#78350f',
   },
   danger: {
     50: '#fef2f2',
+    200: '#fecaca',
     500: '#ef4444',
     600: '#dc2626',
     700: '#b91c1c',
@@ -73,7 +84,6 @@ export const fontFamily = {
 } as const;
 
 export const spacing = {
-  // Custom spacings beyond Tailwind defaults
   '4.5': '1.125rem',
   '13': '3.25rem',
   '15': '3.75rem',
@@ -81,7 +91,6 @@ export const spacing = {
 } as const;
 
 export const borderRadius = {
-  // Keeps CA portal feeling professional, not startup-y
   none: '0',
   sm: '0.25rem',
   DEFAULT: '0.375rem',

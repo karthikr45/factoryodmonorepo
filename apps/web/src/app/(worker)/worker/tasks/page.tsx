@@ -42,7 +42,7 @@ export default function WorkerTasksPage(): JSX.Element {
   const completed_today = (tasks ?? []).filter((t) => t.status === 'COMPLETED').slice(0, 5);
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-brand-900">My tasks</h1>
         <p className="mt-1 text-sm text-neutral-600">

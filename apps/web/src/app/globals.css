@@ -4,16 +4,17 @@
 
 @layer base {
   :root {
+    /* Neptune palette → HSL */
     --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --foreground: 231 54% 22%;            /* brand-900 #1A1F5C */
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --primary: 217 46% 31%;
-    --primary-foreground: 210 40% 98%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --border: 214 32% 91%;
-    --ring: 217 46% 31%;
+    --card-foreground: 231 54% 22%;
+    --primary: 236 100% 66%;              /* brand-600 #525AFF */
+    --primary-foreground: 0 0% 100%;
+    --muted: 221 65% 97%;                 /* brand-50 #F3F6FC */
+    --muted-foreground: 215 30% 50%;
+    --border: 221 60% 90%;                /* brand-100ish */
+    --ring: 236 100% 66%;
     --radius: 0.5rem;
   }
 

@@ -95,7 +95,7 @@ export default function WorkerHomePage(): JSX.Element {
   const pendingTasks = tasks?.filter((t) => t.status !== 'COMPLETED').length ?? 0;
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       {/* Date + greeting */}
       <div>
         <div className="text-sm text-neutral-500">{dayLabel}</div>
