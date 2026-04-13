@@ -132,6 +132,16 @@ export class OrdersController {
     return this.ordersService.create(orgId, user.id, body);
   }
 
+  @Post('orders/with-customer')
+  @ApiOperation({ summary: 'Create order + customer (if new) in one atomic transaction' })
+  async createOrderWithCustomer(
+    @OrgId() orgId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: Parameters<OrdersService['createWithCustomer']>[2],
+  ): ReturnType<OrdersService['createWithCustomer']> {
+    return this.ordersService.createWithCustomer(orgId, user.id, body);
+  }
+
   @Patch('orders/:id')
   @UsePipes(new ZodValidationPipe(updateOrderSchema))
   async updateOrder(

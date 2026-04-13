@@ -16,10 +16,19 @@ interface Props {
   customers: Customer[];
 }
 
+/** Normalize various phone inputs to +91XXXXXXXXXX */
+function normalizePhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 10) return `+91${digits}`;
+  if (digits.length === 11 && digits.startsWith('0')) return `+91${digits.slice(1)}`;
+  if (digits.length === 12 && digits.startsWith('91')) return `+${digits}`;
+  return raw;
+}
+
 export function NewOrderForm({ customers }: Props): JSX.Element {
   const router = useRouter();
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
-  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '' });
+  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', gstin: '' });
   const [addingCustomer, setAddingCustomer] = useState(customers.length === 0);
 
   const [orderNumber, setOrderNumber] = useState('');
@@ -37,31 +46,54 @@ export function NewOrderForm({ customers }: Props): JSX.Element {
     e.preventDefault();
     setError(null);
 
+    // Client-side validation upfront — gives faster feedback than a server roundtrip
+    if (!orderNumber.trim()) { setError('Order number is required'); return; }
+    if (!productName.trim()) { setError('Product / work description is required'); return; }
+    if (!quantity || Number(quantity) <= 0) { setError('Quantity must be greater than 0'); return; }
+    if (!deliveryDate) { setError('Delivery date is required'); return; }
+    if (!totalValueRupees || Number(totalValueRupees) <= 0) { setError('Total value must be greater than 0'); return; }
+
+    if (addingCustomer) {
+      if (!newCustomer.name.trim() || newCustomer.name.trim().length < 2) {
+        setError('Customer name must be at least 2 characters'); return;
+      }
+      const phone = normalizePhone(newCustomer.phone);
+      if (!/^\+91[6-9]\d{9}$/.test(phone)) {
+        setError('Phone must be a valid Indian mobile number (10 digits starting with 6/7/8/9)');
+        return;
+      }
+    } else if (!customerId) {
+      setError('Pick a customer or add a new one'); return;
+    }
+
     start(async () => {
       try {
-        let finalCustomerId = customerId;
+        const payload: Record<string, unknown> = {
+          orderNumber: orderNumber.trim(),
+          productName: productName.trim(),
+          quantity: Number(quantity),
+          unit,
+          deliveryDate: new Date(deliveryDate).toISOString(),
+          totalValue: Math.round(Number(totalValueRupees) * 100),
+          advancePaid: 0,
+          ...(notes.trim() ? { notes: notes.trim() } : {}),
+        };
+
         if (addingCustomer) {
-          const c = await apiCall<{ id: string }>({
-            url: '/customers',
-            method: 'POST',
-            data: newCustomer,
-          });
-          finalCustomerId = c.id;
+          payload.customer = {
+            name: newCustomer.name.trim(),
+            phone: normalizePhone(newCustomer.phone),
+            ...(newCustomer.gstin.trim() ? { gstin: newCustomer.gstin.trim().toUpperCase() } : {}),
+          };
+        } else {
+          payload.customerId = customerId;
         }
-        const order = await apiCall<{ id: string }>({
-          url: '/orders',
+
+        // Single atomic call — creates customer (if new) AND order in one transaction.
+        const order = await apiCall<{ id: string; customerId: string }>({
+          url: '/orders/with-customer',
           method: 'POST',
-          data: {
-            customerId: finalCustomerId,
-            orderNumber,
-            productName,
-            quantity: Number(quantity),
-            unit,
-            deliveryDate: new Date(deliveryDate).toISOString(),
-            totalValue: Math.round(Number(totalValueRupees) * 100),
-            advancePaid: 0,
-            notes: notes || undefined,
-          },
+          data: payload,
         });
         router.push(`/factory/orders/${order.id}`);
       } catch (err) {
@@ -100,17 +132,24 @@ export function NewOrderForm({ customers }: Props): JSX.Element {
           <div className="space-y-3">
             <input
               required
-              placeholder="Customer name"
+              placeholder="Customer name (e.g. Tata Motors)"
               value={newCustomer.name}
               onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
               className="w-full rounded-md border border-neutral-300 px-3 py-2 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
             />
             <input
               required
-              placeholder="+919876543210"
+              placeholder="Phone — 9876543210 or +919876543210"
               value={newCustomer.phone}
               onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
               className="w-full rounded-md border border-neutral-300 px-3 py-2 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+            />
+            <input
+              placeholder="GSTIN (optional, 15 chars)"
+              value={newCustomer.gstin}
+              onChange={(e) => setNewCustomer({ ...newCustomer, gstin: e.target.value.toUpperCase() })}
+              maxLength={15}
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 uppercase focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
             />
             {customers.length > 0 ? (
               <button

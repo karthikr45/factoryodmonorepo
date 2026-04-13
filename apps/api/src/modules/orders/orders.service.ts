@@ -279,6 +279,95 @@ export class OrdersService {
     return { id: order.id };
   }
 
+  /**
+   * Create an order in one atomic call. The caller can either:
+   *  - pass `customerId` to use an existing customer, OR
+   *  - pass `customer: { name, phone, ...}` to create the customer first
+   *
+   * Wrapped in a Prisma transaction so we never end up with an orphan
+   * customer if order creation fails.
+   */
+  async createWithCustomer(
+    orgId: string,
+    userId: string,
+    input: {
+      customerId?: string;
+      customer?: { name: string; phone: string; gstin?: string; email?: string; address?: string };
+      orderNumber: string;
+      productName: string;
+      quantity: number;
+      unit: string;
+      deliveryDate: string | Date;
+      totalValue: number;
+      advancePaid?: number;
+      notes?: string;
+    },
+  ): Promise<{ id: string; customerId: string }> {
+    if (!input.customerId && !input.customer) {
+      throw new BadRequestException('Either customerId or customer details required');
+    }
+
+    return this.prisma.client.$transaction(async (tx) => {
+      // Step 1: get or create the customer
+      let customerId = input.customerId;
+      if (!customerId && input.customer) {
+        // Reuse if a customer with this phone already exists in the org
+        const existing = await tx.customer.findFirst({
+          where: { orgId, phone: input.customer.phone },
+        });
+        if (existing) {
+          customerId = existing.id;
+        } else {
+          const created = await tx.customer.create({
+            data: {
+              orgId,
+              name: input.customer.name,
+              phone: input.customer.phone,
+              gstin: input.customer.gstin ?? null,
+              email: input.customer.email ?? null,
+              address: input.customer.address ?? null,
+              creditLimit: 0n,
+            },
+          });
+          customerId = created.id;
+        }
+      } else {
+        // Verify the customer belongs to this org
+        const existing = await tx.customer.findFirst({
+          where: { id: customerId, orgId },
+        });
+        if (!existing) throw new BadRequestException('Customer not found in this organisation');
+      }
+
+      // Step 2: check the order number is unique for this org
+      const dupe = await tx.order.findFirst({
+        where: { orgId, orderNumber: input.orderNumber },
+      });
+      if (dupe) throw new BadRequestException(`Order number "${input.orderNumber}" already exists`);
+
+      // Step 3: create the order
+      const order = await tx.order.create({
+        data: {
+          orgId,
+          customerId: customerId!,
+          orderNumber: input.orderNumber,
+          productName: input.productName,
+          quantity: input.quantity,
+          unit: input.unit,
+          deliveryDate: new Date(input.deliveryDate),
+          totalValue: BigInt(input.totalValue),
+          advancePaid: BigInt(input.advancePaid ?? 0),
+          notes: input.notes ?? null,
+          createdBy: userId,
+          status: 'ENQUIRY',
+        },
+      });
+
+      this.gateway.emitToOrg(orgId, 'order:created', { id: order.id });
+      return { id: order.id, customerId: customerId! };
+    });
+  }
+
   async update(
     orgId: string,
     id: string,
