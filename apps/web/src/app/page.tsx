@@ -1,6 +1,12 @@
 import Link from 'next/link';
 
 import { AnimatedDashboard } from '@/components/animated-dashboard';
+import { BeforeAfterSection } from '@/components/before-after-section';
+import { FAQSection } from '@/components/faq-section';
+import { LiveDemoSection } from '@/components/live-demo-section';
+import { StatsMarquee } from '@/components/stats-marquee';
+import { TestimonialsSection } from '@/components/testimonials-section';
+import { WatchFlowButton } from '@/components/watch-flow-button';
 
 const JOURNEY_FACTORY = [
   { step: '1', title: 'Sign up in 60 seconds', desc: 'Enter your phone, verify OTP. No credit card.' },
@@ -104,12 +110,7 @@ export default function LandingPage(): JSX.Element {
                 </span>
                 <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
               </Link>
-              <a
-                href="#how"
-                className="rounded-xl border border-white/20 bg-white/5 px-8 py-4 text-base font-semibold text-white backdrop-blur transition hover:border-white/40 hover:bg-white/10"
-              >
-                ▶ Watch the flow
-              </a>
+              <WatchFlowButton />
             </div>
             <div className="mt-10 flex animate-fade-in flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-white/50 [animation-delay:500ms]">
               <span className="flex items-center gap-1.5">
@@ -133,6 +134,9 @@ export default function LandingPage(): JSX.Element {
         {/* Bottom fade */}
         <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-brand-950 to-transparent" />
       </section>
+
+      {/* Stats marquee */}
+      <StatsMarquee />
 
       {/* Problem */}
       <section className="border-y border-neutral-100 bg-neutral-50 py-20">
@@ -161,6 +165,12 @@ export default function LandingPage(): JSX.Element {
           </div>
         </div>
       </section>
+
+      {/* Live demo section */}
+      <LiveDemoSection />
+
+      {/* Before/After */}
+      <BeforeAfterSection />
 
       {/* For Factory Owners */}
       <section id="factory" className="py-20">
@@ -321,6 +331,12 @@ export default function LandingPage(): JSX.Element {
           </div>
         </div>
       </section>
+
+      {/* Testimonials */}
+      <TestimonialsSection />
+
+      {/* FAQ */}
+      <FAQSection />
 
       {/* Pricing */}
       <section id="pricing" className="py-20">
