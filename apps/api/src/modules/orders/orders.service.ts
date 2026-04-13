@@ -136,6 +136,121 @@ export class OrdersService {
     };
   }
 
+  /**
+   * Full order lifecycle — quotation + job cards + QC + dispatch + invoice + payments,
+   * all in one call. This is what the unified order detail page loads.
+   */
+  async getLifecycle(orgId: string, id: string): Promise<{
+    order: {
+      id: string; orderNumber: string; productName: string; quantity: number;
+      unit: string; status: string; deliveryDate: Date; totalValue: number;
+      advancePaid: number; notes: string | null; createdAt: Date;
+      customer: { id: string; name: string; phone: string; gstin: string | null };
+    };
+    quotation: { id: string; quotationNumber: string; status: string; totalAmount: number; validUntil: Date } | null;
+    jobCards: Array<{
+      id: string; status: string;
+      department: { id: string; name: string; sequence: number };
+      startedAt: Date | null; completedAt: Date | null;
+    }>;
+    qualityChecks: Array<{ id: string; status: string; defectNotes: string | null; inspectedAt: Date | null }>;
+    dispatches: Array<{
+      id: string; vehicleNumber: string | null; driverName: string | null;
+      ewayBillNumber: string | null; dispatchDate: Date; deliveredAt: Date | null; status: string;
+    }>;
+    invoice: {
+      id: string; invoiceNumber: string; status: string;
+      totalAmount: number; paidAmount: number; invoiceDate: Date; dueDate: Date | null;
+    } | null;
+    nextAction: { label: string; type: string } | null;
+  }> {
+    const order = await this.prisma.client.order.findFirst({
+      where: { id, orgId },
+      include: {
+        customer: { select: { id: true, name: true, phone: true, gstin: true } },
+        jobCards: {
+          include: { department: { select: { id: true, name: true, sequence: true } } },
+          orderBy: { department: { sequence: 'asc' } },
+        },
+        qualityChecks: { orderBy: { createdAt: 'desc' } },
+        dispatches: { orderBy: { dispatchDate: 'desc' } },
+        invoices: { orderBy: { createdAt: 'desc' }, take: 1 },
+        quotation: true,
+      },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+
+    // Suggest the next action based on current status
+    let nextAction: { label: string; type: string } | null = null;
+    switch (order.status) {
+      case 'ENQUIRY':
+        nextAction = { label: 'Create quotation', type: 'CREATE_QUOTATION' };
+        break;
+      case 'CONFIRMED':
+        if (order.jobCards.length === 0) {
+          nextAction = { label: 'Generate job cards', type: 'GENERATE_JOB_CARDS' };
+        } else {
+          nextAction = { label: 'Start production', type: 'START_PRODUCTION' };
+        }
+        break;
+      case 'IN_PRODUCTION': {
+        const pending = order.jobCards.filter((jc) => jc.status !== 'COMPLETED').length;
+        nextAction = { label: `${pending} job cards remaining`, type: 'WORK_JOB_CARDS' };
+        break;
+      }
+      case 'QUALITY_CHECK':
+        nextAction = { label: 'Run quality check', type: 'QUALITY_CHECK' };
+        break;
+      case 'READY':
+        nextAction = { label: 'Dispatch order', type: 'DISPATCH' };
+        break;
+      case 'DISPATCHED':
+        nextAction = { label: 'Mark delivered', type: 'DELIVERED' };
+        break;
+      case 'DELIVERED':
+        if (order.invoices[0] && Number(order.invoices[0].paidAmount) < Number(order.invoices[0].totalAmount)) {
+          nextAction = { label: 'Record payment', type: 'RECORD_PAYMENT' };
+        }
+        break;
+      default:
+        nextAction = null;
+    }
+
+    return {
+      order: {
+        id: order.id, orderNumber: order.orderNumber,
+        productName: order.productName, quantity: order.quantity, unit: order.unit,
+        status: order.status, deliveryDate: order.deliveryDate,
+        totalValue: Number(order.totalValue), advancePaid: Number(order.advancePaid),
+        notes: order.notes, createdAt: order.createdAt, customer: order.customer,
+      },
+      quotation: order.quotation ? {
+        id: order.quotation.id, quotationNumber: order.quotation.quotationNumber,
+        status: order.quotation.status, totalAmount: Number(order.quotation.totalAmount),
+        validUntil: order.quotation.validUntil,
+      } : null,
+      jobCards: order.jobCards.map((jc) => ({
+        id: jc.id, status: jc.status, department: jc.department,
+        startedAt: jc.startedAt, completedAt: jc.completedAt,
+      })),
+      qualityChecks: order.qualityChecks.map((qc) => ({
+        id: qc.id, status: qc.status, defectNotes: qc.defectNotes, inspectedAt: qc.inspectedAt,
+      })),
+      dispatches: order.dispatches.map((d) => ({
+        id: d.id, vehicleNumber: d.vehicleNumber, driverName: d.driverName,
+        ewayBillNumber: d.ewayBillNumber, dispatchDate: d.dispatchDate,
+        deliveredAt: d.deliveredAt, status: d.status,
+      })),
+      invoice: order.invoices[0] ? {
+        id: order.invoices[0].id, invoiceNumber: order.invoices[0].invoiceNumber,
+        status: order.invoices[0].status, totalAmount: Number(order.invoices[0].totalAmount),
+        paidAmount: Number(order.invoices[0].paidAmount),
+        invoiceDate: order.invoices[0].invoiceDate, dueDate: order.invoices[0].dueDate,
+      } : null,
+      nextAction,
+    };
+  }
+
   async create(orgId: string, userId: string, input: CreateOrderInput): Promise<{ id: string }> {
     // Ensure customer exists within this org
     const customer = await this.prisma.client.customer.findFirst({

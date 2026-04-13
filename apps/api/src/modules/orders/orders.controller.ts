@@ -104,6 +104,15 @@ export class OrdersController {
     });
   }
 
+  @Get('orders/:id/lifecycle')
+  @ApiOperation({ summary: 'Full order lifecycle — quote + job cards + QC + dispatch + invoice' })
+  async getOrderLifecycle(
+    @OrgId() orgId: string,
+    @Param('id') id: string,
+  ): ReturnType<OrdersService['getLifecycle']> {
+    return this.ordersService.getLifecycle(orgId, id);
+  }
+
   @Get('orders/:id')
   @ApiOperation({ summary: 'Get order detail including job cards' })
   async getOrder(
