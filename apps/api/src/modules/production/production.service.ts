@@ -147,6 +147,44 @@ export class ProductionService {
     }));
   }
 
+  /**
+   * Job cards assigned to the current user — for worker self-service.
+   * Also returns PENDING cards in their department if they're in one.
+   */
+  async listMine(orgId: string, userId: string): Promise<Array<{
+    id: string; status: JobCardStatus;
+    department: { id: string; name: string; sequence: number };
+    order: { id: string; orderNumber: string; productName: string; quantity: number; unit: string };
+    startedAt: Date | null; completedAt: Date | null;
+    assignedTo: string | null;
+  }>> {
+    const profile = await this.prisma.client.employeeProfile.findUnique({ where: { userId } });
+    const deptId = profile?.departmentId;
+
+    const rows = await this.prisma.client.jobCard.findMany({
+      where: {
+        orgId,
+        OR: [
+          { assignedTo: userId },
+          ...(deptId ? [{ departmentId: deptId, assignedTo: null, status: 'PENDING' as const }] : []),
+          ...(deptId ? [{ departmentId: deptId, status: 'IN_PROGRESS' as const }] : []),
+        ],
+      },
+      include: {
+        department: { select: { id: true, name: true, sequence: true } },
+        order: { select: { id: true, orderNumber: true, productName: true, quantity: true, unit: true } },
+      },
+      orderBy: [{ status: 'asc' }, { order: { deliveryDate: 'asc' } }],
+      take: 50,
+    });
+    return rows.map((jc) => ({
+      id: jc.id, status: jc.status as JobCardStatus,
+      department: jc.department, order: jc.order,
+      startedAt: jc.startedAt, completedAt: jc.completedAt,
+      assignedTo: jc.assignedTo,
+    }));
+  }
+
   async assign(
     orgId: string,
     id: string,

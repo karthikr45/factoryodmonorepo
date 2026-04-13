@@ -100,8 +100,7 @@ export async function verifyOtpAction(formData: FormData): Promise<ActionResult>
     case 'CA':
       redirect('/ca');
     case 'WORKER':
-      // Workers use the mobile app; on web they see their profile
-      redirect('/factory');
+      redirect('/worker');
     case 'OWNER':
     case 'MANAGER':
     case 'ACCOUNTANT':

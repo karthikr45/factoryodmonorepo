@@ -21,6 +21,7 @@ import {
   type UpdateJobCardStatusInput,
 } from '@repo/validators';
 
+import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { OrgId } from '../../common/decorators/org-id.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 
@@ -71,6 +72,15 @@ export class ProductionController {
     @Query('orderId') orderId?: string,
   ): ReturnType<ProductionService['listJobCards']> {
     return this.productionService.listJobCards(orgId, { status, departmentId, orderId });
+  }
+
+  @Get('job-cards/mine')
+  @ApiOperation({ summary: 'Job cards assigned to me (for workers)' })
+  async myJobCards(
+    @OrgId() orgId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): ReturnType<ProductionService['listMine']> {
+    return this.productionService.listMine(orgId, user.id);
   }
 
   @Post('job-cards/:id/assign')

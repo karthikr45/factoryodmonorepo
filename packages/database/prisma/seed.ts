@@ -380,11 +380,19 @@ async function main(): Promise<void> {
   const existingJc = await prisma.jobCard.count({ where: { orderId: order2.id } });
   if (existingJc === 0) {
     const statuses = ['COMPLETED', 'COMPLETED', 'IN_PROGRESS', 'PENDING', 'PENDING', 'PENDING'];
+    // Assign machining (stage 2, in progress) to Srinivas, assembly (stage 3) to Anil
+    const assignees: Array<string | null> = [
+      machineOp2.id, // Cutting → Anil
+      machineOp1.id, // Machining → Srinivas (in progress)
+      machineOp1.id, // Assembly → Srinivas (pending, next up)
+      null, null, null,
+    ];
     for (let i = 0; i < departments.length; i++) {
       await prisma.jobCard.create({
         data: {
           orderId: order2.id, departmentId: departments[i]!.id, orgId: factory.id,
           status: statuses[i] as never,
+          assignedTo: assignees[i] ?? null,
           ...(statuses[i] === 'COMPLETED' ? { startedAt: daysAgo(8 - i), completedAt: daysAgo(7 - i) } : {}),
           ...(statuses[i] === 'IN_PROGRESS' ? { startedAt: daysAgo(2) } : {}),
         },
@@ -668,10 +676,13 @@ async function main(): Promise<void> {
   console.info('Seed complete!');
   console.info('');
   console.info('Demo logins:');
-  console.info('  Super Admin:    +919999999999  (Platform Admin)');
-  console.info('  Factory Owner:  +919876543210  (Ravi Kumar)');
-  console.info('  Agency Admin:   +919876543211  (Suresh Naidu)');
-  console.info('  CA / Auditor:   +919876543212  (Lakshmi Reddy)');
+  console.info('  Super Admin:      +919999999999  (Platform Admin)');
+  console.info('  Factory Owner:    +919876543210  (Ravi Kumar)');
+  console.info('  Prod Manager:     +919876543220  (Venkat Rao)');
+  console.info('  Worker (direct):  +919876543223  (Srinivas Reddy — CNC Operator)');
+  console.info('  Worker (direct):  +919876543224  (Anil Kumar — Cutting Operator)');
+  console.info('  Agency Admin:     +919876543211  (Suresh Naidu)');
+  console.info('  CA / Auditor:     +919876543212  (Lakshmi Reddy)');
   console.info('');
   console.info('Factory has:');
   console.info('  5 direct employees, 6 contract workers');

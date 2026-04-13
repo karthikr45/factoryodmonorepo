@@ -164,4 +164,117 @@ export class CheckInService {
       isLate: r.isLate,
     }));
   }
+
+  // ============================================================
+  // Self check-in for factory direct employees
+  // ============================================================
+
+  async selfCheckIn(userId: string, factoryOrgId: string, input: {
+    lat?: number; lng?: number; shiftType?: string;
+  }): Promise<{ id: string; isLate: boolean; checkInTime: Date }> {
+    const user = await this.prisma.client.user.findFirst({
+      where: { id: userId, orgId: factoryOrgId },
+    });
+    if (!user) throw new BadRequestException('User not found in this organisation');
+
+    const now = new Date();
+    const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const shift = (input.shiftType ?? 'GENERAL') as never;
+
+    const istHour = (now.getUTCHours() + 5 + Math.floor((now.getUTCMinutes() + 30) / 60)) % 24;
+    const isLate = istHour >= this.SHIFT_START_HOUR + 1;
+
+    const existing = await this.prisma.client.checkInOut.findFirst({
+      where: { userId, factoryOrgId, date: today },
+    });
+    if (existing?.checkInTime) {
+      throw new BadRequestException('You are already checked in today');
+    }
+
+    const record = existing
+      ? await this.prisma.client.checkInOut.update({
+          where: { id: existing.id },
+          data: { checkInTime: now, checkInLat: input.lat, checkInLng: input.lng, isLate },
+        })
+      : await this.prisma.client.checkInOut.create({
+          data: {
+            userId, factoryOrgId, date: today,
+            checkInTime: now, checkInLat: input.lat, checkInLng: input.lng,
+            shiftType: shift, isLate,
+          },
+        });
+    return { id: record.id, isLate, checkInTime: now };
+  }
+
+  async selfCheckOut(userId: string, factoryOrgId: string, input: { lat?: number; lng?: number }): Promise<{
+    id: string; totalHours: number; isEarlyLeave: boolean;
+  }> {
+    const now = new Date();
+    const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+
+    const record = await this.prisma.client.checkInOut.findFirst({
+      where: { userId, factoryOrgId, date: today, checkInTime: { not: null }, checkOutTime: null },
+    });
+    if (!record || !record.checkInTime) {
+      throw new BadRequestException('No active check-in found for today');
+    }
+
+    const totalMs = now.getTime() - record.checkInTime.getTime();
+    const totalHours = Math.round((totalMs / 3_600_000) * 100) / 100;
+    const isEarlyLeave = totalHours < 7;
+
+    await this.prisma.client.checkInOut.update({
+      where: { id: record.id },
+      data: {
+        checkOutTime: now, checkOutLat: input.lat, checkOutLng: input.lng,
+        totalHours, isEarlyLeave,
+      },
+    });
+    return { id: record.id, totalHours, isEarlyLeave };
+  }
+
+  async myStatus(userId: string, factoryOrgId: string): Promise<{
+    checkedIn: boolean; checkInTime: Date | null; checkOutTime: Date | null;
+    totalHours: number | null; isLate: boolean;
+  }> {
+    const now = new Date();
+    const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+
+    const record = await this.prisma.client.checkInOut.findFirst({
+      where: { userId, factoryOrgId, date: today },
+    });
+    if (!record) {
+      return { checkedIn: false, checkInTime: null, checkOutTime: null, totalHours: null, isLate: false };
+    }
+    return {
+      checkedIn: !!record.checkInTime && !record.checkOutTime,
+      checkInTime: record.checkInTime,
+      checkOutTime: record.checkOutTime,
+      totalHours: record.totalHours,
+      isLate: record.isLate,
+    };
+  }
+
+  async myHistory(userId: string, month: number, year: number): Promise<{
+    records: Array<{ date: Date; checkInTime: Date | null; checkOutTime: Date | null; totalHours: number | null; isLate: boolean; }>;
+    summary: { daysPresent: number; totalHours: number; lateCount: number; };
+  }> {
+    const from = new Date(Date.UTC(year, month - 1, 1));
+    const to = new Date(Date.UTC(year, month, 1));
+    const rows = await this.prisma.client.checkInOut.findMany({
+      where: { userId, date: { gte: from, lt: to }, checkInTime: { not: null } },
+      orderBy: { date: 'desc' },
+    });
+    return {
+      records: rows.map((r) => ({
+        date: r.date, checkInTime: r.checkInTime, checkOutTime: r.checkOutTime,
+        totalHours: r.totalHours, isLate: r.isLate,
+      })),
+      summary: {
+        daysPresent: rows.length,
+        totalHours: Math.round(rows.reduce((a, r) => a + (r.totalHours ?? 0), 0) * 10) / 10,
+        lateCount: rows.filter((r) => r.isLate).length,
+      },
+    };
+  }
 }
