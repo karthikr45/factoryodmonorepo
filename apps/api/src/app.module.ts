@@ -7,6 +7,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AccountingModule } from './common/accounting/accounting.module';
 import { PrismaModule } from './common/prisma/prisma.module';
+import { AIAssistantModule } from './modules/ai-assistant/ai-assistant.module';
 import { ApprovalsModule } from './modules/approvals/approvals.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -97,6 +98,7 @@ import { HealthController } from './health.controller';
     CustomRolesModule,
     ApprovalsModule,
     WaitlistModule,
+    AIAssistantModule,
 
     // Finance, Compliance, Reports, Notifications
     FinanceModule,

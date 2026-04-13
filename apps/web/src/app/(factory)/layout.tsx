@@ -1,3 +1,4 @@
+import { AIAssistantButton } from '@/components/ai-assistant';
 import { PortalShell } from '@/components/portal-shell';
 
 const nav = [
@@ -20,6 +21,7 @@ export default function FactoryLayout({
   return (
     <PortalShell portalName="Factory" accent="brand" nav={nav}>
       {children}
+      <AIAssistantButton />
     </PortalShell>
   );
 }

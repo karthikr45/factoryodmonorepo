@@ -69,6 +69,34 @@ export function WorkflowDesigner({
       : [{ name: 'New stage', sequence: 1, icon: '⚙️' }],
   );
   const [editingStage, setEditingStage] = useState<number | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiPending, startAi] = useTransition();
+
+  const generateWithAI = (): void => {
+    if (!aiPrompt.trim()) return;
+    startAi(async () => {
+      try {
+        const res = await apiCall<{
+          name: string; description: string; industry: string; icon: string;
+          stages: Array<{ name: string; icon: string; sequence: number; slaHours: number; qcRequired: boolean; isOutsourced: boolean; description: string }>;
+        }>({ url: '/ai/generate-workflow', method: 'POST', data: { description: aiPrompt } });
+        setName(res.name);
+        setDescription(res.description);
+        setIndustry(res.industry);
+        setIcon(res.icon);
+        setStages(res.stages.map((s, i) => ({
+          name: s.name, icon: s.icon, sequence: s.sequence ?? i + 1,
+          slaHours: s.slaHours, qcRequired: s.qcRequired, isOutsourced: s.isOutsourced,
+          description: s.description,
+        })));
+        setAiOpen(false);
+        setAiPrompt('');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'AI generation failed');
+      }
+    });
+  };
 
   const moveStage = (idx: number, dir: -1 | 1): void => {
     const next = idx + dir;
@@ -132,10 +160,41 @@ export function WorkflowDesigner({
           </p>
         </div>
         <div className="flex gap-2">
+          {!existing && (
+            <button onClick={() => setAiOpen(true)}
+              className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-brand-700 to-highlight-400 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-brand-600/20 transition hover:shadow-xl">
+              <span>✨</span> Generate with AI
+            </button>
+          )}
           <Button variant="outline" onClick={() => router.push('/factory/workflows')}>Cancel</Button>
           <Button onClick={save} disabled={pending}>{pending ? 'Saving...' : 'Save workflow'}</Button>
         </div>
       </div>
+
+      {/* AI generator modal */}
+      {aiOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-brand-950/50" onClick={() => setAiOpen(false)} />
+          <div className="relative w-full max-w-xl animate-scale-in rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">✨</span>
+              <div>
+                <h2 className="text-xl font-bold text-brand-900">Generate workflow with AI</h2>
+                <p className="text-sm text-neutral-600">Describe your business in 1-2 sentences and we'll draft a workflow.</p>
+              </div>
+            </div>
+            <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)}
+              rows={4} placeholder="e.g., I run a small CNC workshop in Hyderabad making auto components for Tata. We do cutting, machining, and grinding."
+              className="mt-4 w-full rounded-lg border border-neutral-300 px-4 py-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-100" />
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setAiOpen(false)}>Cancel</Button>
+              <Button onClick={generateWithAI} disabled={aiPending || !aiPrompt.trim()}>
+                {aiPending ? 'Thinking...' : '✨ Generate workflow'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && <div className="mt-4 rounded-md bg-danger-50 px-4 py-2 text-sm text-danger-700">{error}</div>}
 
