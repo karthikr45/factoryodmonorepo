@@ -101,6 +101,11 @@ export function LoginForm(): JSX.Element {
           {error}
         </div>
       ) : null}
+
+      <div className="mt-6 border-t border-neutral-100 pt-4 text-center text-sm text-neutral-600">
+        New to FactoryOS?{' '}
+        <a href="/signup" className="font-semibold text-brand-700 hover:underline">Create an account</a>
+      </div>
     </div>
   );
 }

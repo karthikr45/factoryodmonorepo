@@ -1,19 +1,19 @@
 'use client';
 
-import { use, useState, useTransition } from 'react';
+import Link from 'next/link';
+import { useState, useTransition } from 'react';
 
 import { Button } from '@/components/ui/button';
 
 import { requestOtpAction, verifyOtpAction } from '../login/actions';
 
 interface Props {
-  searchParamsPromise: Promise<{ role?: string; token?: string }>;
+  role: string | null;
+  inviteToken: string | null;
 }
 
-export function SignupForm({ searchParamsPromise }: Props): JSX.Element {
-  const sp = use(searchParamsPromise);
-  const roleHint = sp.role ?? null;
-  const inviteToken = sp.token ?? null;
+export function SignupForm({ role, inviteToken }: Props): JSX.Element {
+  const roleHint = role;
 
   const [phone, setPhone] = useState('+91');
   const [code, setCode] = useState('');
@@ -112,6 +112,11 @@ export function SignupForm({ searchParamsPromise }: Props): JSX.Element {
       {error ? (
         <div className="mt-4 rounded-md bg-danger-50 px-3 py-2 text-sm text-danger-700">{error}</div>
       ) : null}
+
+      <div className="mt-6 border-t border-neutral-100 pt-4 text-center text-sm text-neutral-600">
+        Already have an account?{' '}
+        <Link href="/login" className="font-semibold text-brand-700 hover:underline">Sign in</Link>
+      </div>
     </div>
   );
 }
