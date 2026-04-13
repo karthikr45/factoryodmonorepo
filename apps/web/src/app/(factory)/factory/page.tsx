@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+import { AnomaliesWidget } from '@/components/anomalies-widget';
 import { apiCallServer } from '@/lib/api';
 import { ACCESS_COOKIE, getCurrentUser } from '@/lib/auth';
 import { formatINR } from '@/lib/utils';
@@ -74,6 +75,11 @@ export default async function FactoryDashboardPage(): Promise<JSX.Element> {
         </div>
       ) : (
         <>
+          {/* AI anomalies (always-on insight) */}
+          <div className="mt-8">
+            <AnomaliesWidget />
+          </div>
+
           {/* Today's actions — THE most important section */}
           {(data.pendingAttendanceApproval > 0 || data.pendingJobCards > 0 || recentOrders.some((o) => o.status === 'ENQUIRY')) && (
             <div className="mt-8">

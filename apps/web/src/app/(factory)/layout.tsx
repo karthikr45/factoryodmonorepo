@@ -1,4 +1,5 @@
 import { AIAssistantButton } from '@/components/ai-assistant';
+import { OnboardingTour } from '@/components/onboarding-tour';
 import { PortalShell } from '@/components/portal-shell';
 
 const nav = [
@@ -22,6 +23,7 @@ export default function FactoryLayout({
     <PortalShell portalName="Factory" accent="brand" nav={nav}>
       {children}
       <AIAssistantButton />
+      <OnboardingTour />
     </PortalShell>
   );
 }

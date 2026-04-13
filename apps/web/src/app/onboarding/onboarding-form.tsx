@@ -48,9 +48,17 @@ export function OnboardingForm(): JSX.Element {
           url: '/organisations/onboard', method: 'POST',
           data: { name, gstin: gstin || undefined, type, ownerName },
         });
-        // Agencies and CAs skip team/connect steps (simpler flow)
-        if (type === OrganisationType.FACTORY) setStep('team');
-        else setStep('done');
+        // For factories, also seed workflow templates and role templates so
+        // they have a working setup immediately
+        if (type === OrganisationType.FACTORY) {
+          await Promise.all([
+            apiCall({ url: '/workflows/seed-system-templates', method: 'POST' }).catch(() => undefined),
+            apiCall({ url: '/custom-roles/seed-system-roles', method: 'POST' }).catch(() => undefined),
+          ]);
+          setStep('team');
+        } else {
+          setStep('done');
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed');
       }
