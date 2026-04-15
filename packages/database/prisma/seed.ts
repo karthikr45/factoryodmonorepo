@@ -673,6 +673,98 @@ async function main(): Promise<void> {
     });
   }
 
+  // ================================================================
+  // CMS — Testimonials + FAQs (managed via super admin going forward)
+  // ================================================================
+  const testimonials = [
+    {
+      author: 'Ravi Kumar', title: 'Owner, Hyderabad Precision Components',
+      quote: "Before FactoryOS, I was the only one who knew what was happening in my factory. Now my production manager runs everything and I see real-time updates on my phone. My stress dropped overnight.",
+      initials: 'RK', colorFrom: '#562F54', colorTo: '#80567D', sortOrder: 1,
+    },
+    {
+      author: 'Suresh Naidu', title: 'Founder, Deccan Labour Services',
+      quote: "Attendance disputes used to take 3 days every month. Now the factory owner approves in one tap and I get paid faster. My workers also trust the numbers.",
+      initials: 'SN', colorFrom: '#4AC843', colorTo: '#8DF688', sortOrder: 2,
+    },
+    {
+      author: 'Lakshmi Reddy, CA', title: 'Reddy & Associates',
+      quote: "I used to chase my factory clients for Tally backups every month. With FactoryOS I already have the data. GSTR-1 drafts generate themselves. My practice scales without hiring more staff.",
+      initials: 'LR', colorFrom: '#F650BD', colorTo: '#A92179', sortOrder: 3,
+    },
+    {
+      author: 'Mahesh Rao', title: 'MD, Balanagar Components',
+      quote: "The profit-per-order report showed me I was losing money on 3 of my big customers. I renegotiated with them and saved ₹4 lakhs last quarter.",
+      initials: 'MR', colorFrom: '#562F54', colorTo: '#F650BD', sortOrder: 4,
+    },
+  ];
+  for (const t of testimonials) {
+    const existing = await prisma.testimonial.findFirst({ where: { author: t.author } });
+    if (!existing) await prisma.testimonial.create({ data: t });
+  }
+
+  const faqs = [
+    {
+      question: 'Do I need to stop using Tally right away?',
+      answer: "No. FactoryOS works alongside Tally. Your journal entries generate automatically — you can export them to Tally any time. Most of our customers stop using Tally within 3 months because there's nothing left to do there.",
+      category: 'GENERAL', sortOrder: 1,
+    },
+    {
+      question: 'What if my staff has low digital literacy?',
+      answer: "FactoryOS is designed for that reality. Workers use big buttons on their phone — one tap to check in, one tap to mark a job card done. Floor managers don't need to type anything.",
+      category: 'ONBOARDING', sortOrder: 2,
+    },
+    {
+      question: 'How is GST handled?',
+      answer: 'Every dispatched order auto-calculates GST, creates a tax invoice, and posts the output GST entry. Every received purchase posts input GST. GSTR-1 and GSTR-3B draft themselves from your transactions.',
+      category: 'COMPLIANCE', sortOrder: 3,
+    },
+    {
+      question: 'What about my CA — will they use this?',
+      answer: 'Your CA gets their own portal. They see your books live, generate GST returns, and raise queries through the app. You invite them during onboarding.',
+      category: 'GENERAL', sortOrder: 4,
+    },
+    {
+      question: 'What does it cost?',
+      answer: 'The Free plan supports up to 20 workers and 50 orders per month. The Pro plan at ₹2,999/month unlocks unlimited everything, advanced reports, AI assistant, and WhatsApp integration. First 50 signups get founder pricing of ₹2,999/month for life.',
+      category: 'PRICING', sortOrder: 5,
+    },
+    {
+      question: 'Will my data be safe?',
+      answer: 'Every query is automatically scoped to your organisation. No other factory can ever see your data. Postgres with row-level security and JWT authentication. Financial data encrypted at rest.',
+      category: 'TECHNICAL', sortOrder: 6,
+    },
+    {
+      question: 'How long does onboarding take?',
+      answer: '60 seconds to sign up. About 10 minutes to invite your team and connect your CA/agency. First order can be tracked on day 1. Most factories are fully operational within a week.',
+      category: 'ONBOARDING', sortOrder: 7,
+    },
+    {
+      question: 'What if I need help?',
+      answer: 'WhatsApp support on the Pro plan. Pilot customers in Hyderabad get a dedicated onboarding call. Our engineering team is in India.',
+      category: 'GENERAL', sortOrder: 8,
+    },
+  ];
+  for (const f of faqs) {
+    const existing = await prisma.fAQ.findFirst({ where: { question: f.question } });
+    if (!existing) await prisma.fAQ.create({ data: { ...f, category: f.category as never } });
+  }
+
+  // Optional content blocks
+  const blocks = [
+    { key: 'announcement.banner', value: '', type: 'string' },
+    { key: 'pricing.starter.price', value: '0', type: 'string' },
+    { key: 'pricing.growth.price', value: '4999', type: 'string' },
+    { key: 'pricing.growth.founder', value: '2999', type: 'string' },
+  ];
+  for (const b of blocks) {
+    await prisma.contentBlock.upsert({
+      where: { key: b.key },
+      update: {},
+      create: { key: b.key, value: b.value, type: b.type },
+    });
+  }
+
   console.info('Seed complete!');
   console.info('');
   console.info('Demo logins:');

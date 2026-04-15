@@ -431,24 +431,42 @@ export default function LandingPage(): JSX.Element {
 
       {/* Footer */}
       <footer className="border-t border-neutral-100 bg-white">
-        <div className="mx-auto max-w-6xl px-6 py-10">
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div className="max-w-sm">
+        <div className="mx-auto max-w-6xl px-6 py-12">
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+            <div className="col-span-2">
               <div className="flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded bg-brand-900 text-xs font-bold text-white">F</div>
-                <span className="font-semibold text-brand-900">FactoryOS</span>
+                <div className="flex h-7 w-7 items-center justify-center rounded bg-brand-900 text-xs font-bold text-white">F</div>
+                <span className="font-bold text-brand-900">FactoryOS</span>
               </div>
-              <p className="mt-3 text-sm text-neutral-600">
-                Built for Indian manufacturing. All amounts in INR. GST compliant.
+              <p className="mt-3 max-w-xs text-sm text-neutral-600">
+                Manufacturing operations + finance for Indian SMBs. Built in India, for India.
+              </p>
+              <p className="mt-3 text-xs text-neutral-500">
+                MK Tech Monk Pvt Ltd<br />
+                Hyderabad, Telangana
               </p>
             </div>
-            <div className="flex gap-6 text-sm text-neutral-500">
-              <Link href="/login" className="hover:text-brand-900">Sign in</Link>
-              <Link href="/signup" className="hover:text-brand-900">Sign up</Link>
-              <a href="#pricing" className="hover:text-brand-900">Pricing</a>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-brand-900">Product</div>
+              <ul className="mt-3 space-y-2 text-sm text-neutral-600">
+                <li><Link href="/signup" className="hover:text-brand-700">Sign up free</Link></li>
+                <li><Link href="/login" className="hover:text-brand-700">Sign in</Link></li>
+                <li><a href="/#pricing" className="hover:text-brand-700">Pricing</a></li>
+                <li><a href="/#waitlist" className="hover:text-brand-700">Waitlist</a></li>
+              </ul>
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-brand-900">Company</div>
+              <ul className="mt-3 space-y-2 text-sm text-neutral-600">
+                <li><Link href="/about" className="hover:text-brand-700">About</Link></li>
+                <li><Link href="/contact" className="hover:text-brand-700">Contact</Link></li>
+                <li><Link href="/privacy" className="hover:text-brand-700">Privacy</Link></li>
+                <li><Link href="/terms" className="hover:text-brand-700">Terms</Link></li>
+                <li><Link href="/refund" className="hover:text-brand-700">Refund policy</Link></li>
+              </ul>
             </div>
           </div>
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 pt-6 text-xs text-neutral-500">
+          <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 pt-6 text-xs text-neutral-500">
             <span>&copy; {new Date().getFullYear()} FactoryOS. All rights reserved.</span>
             <a href="https://mktechmonk.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 font-medium text-neutral-600 transition hover:text-brand-700">
               Powered by <span className="font-bold text-brand-800">MK Tech Monk</span>

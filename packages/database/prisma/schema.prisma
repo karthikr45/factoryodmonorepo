@@ -1411,3 +1411,94 @@ model AIInteraction {
   @@index([orgId, type, createdAt])
   @@map("ai_interactions")
 }
+
+// ======================================================================
+// CMS — Public-facing content managed via super admin
+// (testimonials, FAQs, contact form submissions, generic content blocks)
+// ======================================================================
+
+model Testimonial {
+  id          String   @id @default(uuid())
+  author      String
+  title       String?  // role / company
+  quote       String
+  initials    String?
+  avatarUrl   String?
+  colorFrom   String?  // gradient start
+  colorTo     String?  // gradient end
+  isPublished Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isPublished, sortOrder])
+  @@map("testimonials")
+}
+
+enum FAQCategory {
+  GENERAL
+  PRICING
+  TECHNICAL
+  ONBOARDING
+  COMPLIANCE
+}
+
+model FAQ {
+  id          String      @id @default(uuid())
+  question    String
+  answer      String
+  category    FAQCategory @default(GENERAL)
+  isPublished Boolean     @default(true)
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([category, isPublished, sortOrder])
+  @@map("faqs")
+}
+
+enum ContactStatus {
+  NEW
+  IN_PROGRESS
+  RESPONDED
+  CLOSED
+  SPAM
+}
+
+model ContactSubmission {
+  id        String        @id @default(uuid())
+  name      String
+  email     String
+  phone     String?
+  company   String?
+  subject   String?
+  message   String
+  status    ContactStatus @default(NEW)
+  source    String?       // page where submitted
+  ipAddress String?
+  notes     String?       // internal notes
+  createdAt DateTime      @default(now())
+
+  @@index([status, createdAt])
+  @@map("contact_submissions")
+}
+
+/**
+ * Generic content block — used for misc strings that admin wants to manage
+ * without a code change. Examples:
+ *  - hero.headline
+ *  - pricing.starter.features (JSON)
+ *  - announcement.banner
+ *  - landing.demo_scenes (JSON array)
+ */
+model ContentBlock {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String   @db.Text
+  type      String   @default("string") // string, json, html, markdown
+  notes     String?
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@map("content_blocks")
+}

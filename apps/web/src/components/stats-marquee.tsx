@@ -1,21 +1,41 @@
-const STATS = [
-  { value: '3,500+', label: 'Orders tracked' },
-  { value: '₹120 Cr', label: 'GMV processed' },
-  { value: '45', label: 'Factories' },
-  { value: '12', label: 'States' },
-  { value: '2,800+', label: 'Workers deployed' },
+'use client';
+
+import { useEffect, useState } from 'react';
+
+interface Stat {
+  value: string;
+  label: string;
+}
+
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+
+const FALLBACK: Stat[] = [
+  { value: '0', label: 'Orders tracked' },
+  { value: '₹0', label: 'GMV processed' },
+  { value: 'Coming soon', label: 'Factories' },
+  { value: '—', label: 'States' },
+  { value: '0', label: 'Workers tracked' },
   { value: '0', label: 'Manual entries' },
   { value: '99.9%', label: 'Uptime' },
   { value: '< 2s', label: 'Journal latency' },
 ];
 
 export function StatsMarquee(): JSX.Element {
-  // Duplicate the array so the marquee loops seamlessly
-  const doubled = [...STATS, ...STATS];
+  const [stats, setStats] = useState<Stat[]>(FALLBACK);
+
+  useEffect(() => {
+    void fetch(`${apiUrl}/api/content/stats`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (j?.data && Array.isArray(j.data) && j.data.length > 0) setStats(j.data);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const doubled = [...stats, ...stats];
 
   return (
     <section className="relative overflow-hidden border-y border-brand-800 bg-brand-950 py-10">
-      {/* Gradient fades on left/right edges */}
       <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-24 bg-gradient-to-r from-brand-950 to-transparent" />
       <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-24 bg-gradient-to-l from-brand-950 to-transparent" />
 

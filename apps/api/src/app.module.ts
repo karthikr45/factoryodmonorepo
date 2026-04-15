@@ -15,6 +15,7 @@ import { BomModule } from './modules/bom/bom.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { CheckInModule } from './modules/check-in/check-in.module';
 import { ComplianceModule } from './modules/compliance/compliance.module';
+import { ContentModule } from './modules/content/content.module';
 import { CustomRolesModule } from './modules/custom-roles/custom-roles.module';
 import { FilesModule } from './modules/files/files.module';
 import { FinanceModule } from './modules/finance/finance.module';
@@ -99,6 +100,7 @@ import { HealthController } from './health.controller';
     ApprovalsModule,
     WaitlistModule,
     AIAssistantModule,
+    ContentModule,
 
     // Finance, Compliance, Reports, Notifications
     FinanceModule,

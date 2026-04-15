@@ -3,8 +3,8 @@ import { PortalShell } from '@/components/portal-shell';
 const nav = [
   { href: '/admin', label: 'Platform' },
   { href: '/admin/organisations', label: 'Organisations' },
-  { href: '/admin/users', label: 'Users' },
-  { href: '/admin/settings', label: 'Settings' },
+  { href: '/admin/contact', label: 'Contact submissions' },
+  { href: '/admin/content', label: 'Marketing content' },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }): JSX.Element {
