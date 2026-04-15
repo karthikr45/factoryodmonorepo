@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Header, Param, Post, Query, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 
 import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { OrgId } from '../../common/decorators/org-id.decorator';
@@ -33,5 +34,18 @@ export class QuotationsController {
   @Post(':id/status')
   async updateStatus(@OrgId() orgId: string, @Param('id') id: string, @Body() body: { status: string }): ReturnType<QuotationsService['updateStatus']> {
     return this.quotationsService.updateStatus(orgId, id, body.status);
+  }
+
+  @Get(':id/pdf')
+  @Header('Content-Type', 'application/pdf')
+  async getPdf(
+    @OrgId() orgId: string,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { buffer, filename } = await this.quotationsService.getPdf(orgId, id);
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Content-Length', String(buffer.length));
+    res.end(buffer);
   }
 }

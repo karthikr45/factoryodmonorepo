@@ -9,6 +9,7 @@ import type {
 
 import { AccountingService } from '../../common/accounting/accounting.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { ApprovalsService } from '../approvals/approvals.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -44,6 +45,7 @@ export class OrdersService {
     private readonly accounting: AccountingService,
     private readonly notifications: NotificationsService,
     private readonly gateway: NotificationsGateway,
+    private readonly approvals: ApprovalsService,
   ) {}
 
   async list(
@@ -251,12 +253,15 @@ export class OrdersService {
     };
   }
 
-  async create(orgId: string, userId: string, input: CreateOrderInput): Promise<{ id: string }> {
+  async create(orgId: string, userId: string, input: CreateOrderInput & { workflowTemplateId?: string }): Promise<{ id: string }> {
     // Ensure customer exists within this org
     const customer = await this.prisma.client.customer.findFirst({
       where: { id: input.customerId, orgId },
     });
     if (!customer) throw new BadRequestException('Customer not found in this organisation');
+
+    // Resolve workflow template: explicit > org default > none
+    const workflow = await this.resolveWorkflowTemplate(orgId, input.workflowTemplateId);
 
     const order = await this.prisma.client.order.create({
       data: {
@@ -272,11 +277,63 @@ export class OrdersService {
         notes: input.notes ?? null,
         createdBy: userId,
         status: 'ENQUIRY',
+        ...(workflow
+          ? {
+              workflowTemplateId: workflow.id,
+              workflowSnapshot: workflow.snapshot as never,
+            }
+          : {}),
       },
     });
 
     this.gateway.emitToOrg(orgId, 'order:created', { id: order.id });
     return { id: order.id };
+  }
+
+  /**
+   * Find the workflow template to apply to a new order. Looks up by explicit id
+   * first, then falls back to the org's default template (if one is marked
+   * isDefault=true). Returns null if neither exists.
+   * The returned snapshot is stored on the Order so stage changes later
+   * don't retroactively affect orders already in flight.
+   */
+  private async resolveWorkflowTemplate(
+    orgId: string,
+    explicitId?: string,
+  ): Promise<{ id: string; snapshot: unknown } | null> {
+    let tpl = explicitId
+      ? await this.prisma.client.workflowTemplate.findFirst({
+          where: { id: explicitId, orgId },
+          include: { stages: { orderBy: { sequence: 'asc' } } },
+        })
+      : null;
+    if (!tpl) {
+      tpl = await this.prisma.client.workflowTemplate.findFirst({
+        where: { orgId, isDefault: true },
+        include: { stages: { orderBy: { sequence: 'asc' } } },
+      });
+    }
+    if (!tpl) return null;
+    return {
+      id: tpl.id,
+      snapshot: {
+        id: tpl.id,
+        name: tpl.name,
+        industry: tpl.industry,
+        stages: tpl.stages.map((s) => ({
+          id: s.id,
+          name: s.name,
+          sequence: s.sequence,
+          parallelGroupId: s.parallelGroupId,
+          assignedRoleId: s.assignedRoleId,
+          slaHours: s.slaHours,
+          qcRequired: s.qcRequired,
+          qcChecklist: s.qcChecklist,
+          isOutsourced: s.isOutsourced,
+          autoAdvance: s.autoAdvance,
+        })),
+      },
+    };
   }
 
   /**
@@ -301,11 +358,14 @@ export class OrdersService {
       totalValue: number;
       advancePaid?: number;
       notes?: string;
+      workflowTemplateId?: string;
     },
-  ): Promise<{ id: string; customerId: string }> {
+  ): Promise<{ id: string; customerId: string; workflowTemplateId: string | null }> {
     if (!input.customerId && !input.customer) {
       throw new BadRequestException('Either customerId or customer details required');
     }
+
+    const workflow = await this.resolveWorkflowTemplate(orgId, input.workflowTemplateId);
 
     return this.prisma.client.$transaction(async (tx) => {
       // Step 1: get or create the customer
@@ -360,11 +420,21 @@ export class OrdersService {
           notes: input.notes ?? null,
           createdBy: userId,
           status: 'ENQUIRY',
+          ...(workflow
+            ? {
+                workflowTemplateId: workflow.id,
+                workflowSnapshot: workflow.snapshot as never,
+              }
+            : {}),
         },
       });
 
       this.gateway.emitToOrg(orgId, 'order:created', { id: order.id });
-      return { id: order.id, customerId: customerId! };
+      return {
+        id: order.id,
+        customerId: customerId!,
+        workflowTemplateId: workflow?.id ?? null,
+      };
     });
   }
 
@@ -416,6 +486,34 @@ export class OrdersService {
       );
     }
 
+    // Pre-check approval rules for protected transitions.
+    // DISPATCH is the most sensitive — blocks until approved.
+    if (input.status === OrderStatus.DISPATCHED) {
+      // Was this dispatch already approved? Look for an APPROVED ApprovalRequest on this order.
+      const priorApproval = await this.prisma.client.approvalRequest.findFirst({
+        where: { orgId, subjectType: 'ORDER', subjectId: id, triggerType: 'ORDER_DISPATCH', status: 'APPROVED' },
+      });
+      if (!priorApproval) {
+        const result = await this.approvals.fireEvent(orgId, {
+          triggerType: 'ORDER_DISPATCH',
+          subjectType: 'ORDER',
+          subjectId: id,
+          requestedBy: userId,
+          fieldValue: Number(existing.totalValue) / 100,
+          metadata: {
+            orderNumber: existing.orderNumber,
+            productName: existing.productName,
+            totalRupees: Number(existing.totalValue) / 100,
+          },
+        });
+        if (result.requiresApproval) {
+          throw new BadRequestException(
+            `This dispatch requires approval. Request created (${result.requestIds.join(', ')}). Once approved, retry dispatch.`,
+          );
+        }
+      }
+    }
+
     const updated = await this.prisma.client.order.update({
       where: { id },
       data: { status: input.status },
@@ -424,20 +522,64 @@ export class OrdersService {
     // --- Auto-triggers based on new status ---
 
     if (input.status === OrderStatus.CONFIRMED) {
-      // Auto-generate job cards for every active department
-      const departments = await this.prisma.client.department.findMany({
-        where: { orgId, isActive: true },
-        orderBy: { sequence: 'asc' },
-      });
-      if (departments.length > 0) {
-        await this.prisma.client.jobCard.createMany({
-          data: departments.map((d) => ({
-            orderId: id,
-            departmentId: d.id,
-            orgId,
-            status: 'PENDING' as const,
-          })),
+      // Prefer the workflow snapshot stored on the order. Falls back to the
+      // org's active Department rows if no workflow was selected.
+      const snapshot = existing.workflowSnapshot as
+        | { stages?: Array<{ id: string; name: string; sequence: number }> }
+        | null;
+      const stages = snapshot?.stages ?? [];
+
+      if (stages.length > 0) {
+        // Map each workflow stage to a department (create/update by name).
+        // JobCard requires a departmentId, so we upsert a department per
+        // stage to keep the existing schema happy.
+        for (const s of stages) {
+          const dept = await this.prisma.client.department.upsert({
+            where: { id: `${id}:${s.id}` }, // synthetic stable id
+            update: {},
+            create: {
+              id: `${id}:${s.id}`,
+              orgId,
+              name: s.name,
+              sequence: s.sequence,
+              isActive: true,
+            },
+          }).catch(async () => {
+            // If synthetic id collides or isn't accepted, fall back to
+            // findFirst + create by name+orgId.
+            const found = await this.prisma.client.department.findFirst({
+              where: { orgId, name: s.name },
+            });
+            if (found) return found;
+            return this.prisma.client.department.create({
+              data: { orgId, name: s.name, sequence: s.sequence, isActive: true },
+            });
+          });
+          await this.prisma.client.jobCard.create({
+            data: {
+              orderId: id,
+              departmentId: dept.id,
+              orgId,
+              status: 'PENDING' as const,
+            },
+          });
+        }
+      } else {
+        // No workflow: legacy fallback — job card per active department.
+        const departments = await this.prisma.client.department.findMany({
+          where: { orgId, isActive: true },
+          orderBy: { sequence: 'asc' },
         });
+        if (departments.length > 0) {
+          await this.prisma.client.jobCard.createMany({
+            data: departments.map((d) => ({
+              orderId: id,
+              departmentId: d.id,
+              orgId,
+              status: 'PENDING' as const,
+            })),
+          });
+        }
       }
     }
 

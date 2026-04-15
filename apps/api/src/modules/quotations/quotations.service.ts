@@ -1,12 +1,54 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
+import { PdfService } from '../../common/pdf/pdf.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
-interface QuotationItem { description: string; quantity: number; unit: string; unitPrice: number; gstRate: number; }
+interface QuotationItem { description: string; quantity: number; unit: string; unitPrice: number; gstRate: number; hsnCode?: string }
 
 @Injectable()
 export class QuotationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pdf: PdfService,
+  ) {}
+
+  async getPdf(orgId: string, id: string): Promise<{ buffer: Buffer; filename: string }> {
+    const q = await this.prisma.client.quotation.findFirst({
+      where: { id, orgId },
+      include: {
+        customer: { select: { name: true, gstin: true, address: true, phone: true } },
+        organisation: { select: { name: true, gstin: true } },
+      },
+    });
+    if (!q) throw new NotFoundException('Quotation not found');
+
+    const items = (q.items as Array<QuotationItem>).map((it) => ({
+      description: it.description,
+      quantity: it.quantity,
+      unit: it.unit,
+      unitPricePaise: it.unitPrice,
+      gstRate: it.gstRate,
+      hsnCode: it.hsnCode ?? null,
+    }));
+
+    const buffer = await this.pdf.buildQuotation({
+      org: q.organisation,
+      quotation: {
+        number: q.quotationNumber,
+        date: q.createdAt,
+        validUntil: q.validUntil,
+        notes: q.notes,
+      },
+      customer: q.customer,
+      items,
+      summary: {
+        netPaise: Number(q.subtotal),
+        gstPaise: Number(q.gstAmount),
+        totalPaise: Number(q.totalAmount),
+      },
+    });
+    return { buffer, filename: `${q.quotationNumber}.pdf` };
+  }
 
   async create(orgId: string, userId: string, input: {
     customerId: string; quotationNumber: string; items: QuotationItem[];

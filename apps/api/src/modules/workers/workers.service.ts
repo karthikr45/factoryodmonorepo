@@ -7,6 +7,7 @@ import type {
 } from '@repo/validators';
 
 import { AccountingService } from '../../common/accounting/accounting.service';
+import { PdfService } from '../../common/pdf/pdf.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 export interface WorkerListItem {
@@ -24,7 +25,54 @@ export class WorkersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly accounting: AccountingService,
+    private readonly pdf: PdfService,
   ) {}
+
+  /**
+   * Build a salary slip PDF for a single payroll row. Visible to both the
+   * agency (that generates payroll) and the factory (that pays it).
+   */
+  async getPayrollSlipPdf(orgId: string, id: string): Promise<{ buffer: Buffer; filename: string }> {
+    const row = await this.prisma.client.payroll.findFirst({
+      where: {
+        id,
+        OR: [{ factoryOrgId: orgId }, { agencyOrgId: orgId }],
+      },
+      include: {
+        worker: { select: { name: true, skill: true, aadhaarLast4: true } },
+        factory: { select: { name: true } },
+      },
+    });
+    if (!row) throw new NotFoundException('Payroll row not found');
+
+    const buffer = await this.pdf.buildSalarySlip({
+      org: row.factory,
+      employee: {
+        name: row.worker.name,
+        designation: row.worker.skill,
+        department: null,
+        panNumber: null,
+        bankAccount: row.worker.aadhaarLast4 ? `XXXX-${row.worker.aadhaarLast4}` : null,
+        ifscCode: null,
+      },
+      period: { month: row.month, year: row.year },
+      earnings: {
+        basicPaise: Number(row.basicAmount) - Number(row.epfDeduction) - Number(row.esicDeduction) < 0
+          ? Number(row.basicAmount)
+          : Number(row.basicAmount),
+      },
+      deductions: {
+        pfPaise: Number(row.epfDeduction),
+        esiPaise: Number(row.esicDeduction),
+      },
+      attendance: {
+        workedDays: row.daysPresent + row.daysAbsent,
+        presentDays: row.daysPresent,
+        paidLeave: 0,
+      },
+    });
+    return { buffer, filename: `salary-slip-${row.worker.name}-${row.month}-${row.year}.pdf` };
+  }
 
   // ---- Workers master (agency side) ----
 

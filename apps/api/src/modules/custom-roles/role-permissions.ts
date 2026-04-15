@@ -80,6 +80,46 @@ export const PERMISSION_GROUPS: Array<{
 export const ALL_PERMISSIONS: string[] = PERMISSION_GROUPS.flatMap((g) => g.permissions.map((p) => p.key));
 
 /**
+ * Default permission set per built-in UserRole enum value.
+ * Used when a user has no customRoleId — provides a sensible baseline.
+ */
+export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
+  SUPER_ADMIN: ALL_PERMISSIONS,
+  OWNER: ALL_PERMISSIONS,
+  MANAGER: [
+    'orders.view', 'orders.create', 'orders.edit', 'orders.dispatch',
+    'production.view', 'production.update', 'production.assign',
+    'qc.view', 'qc.perform', 'qc.approve',
+    'inventory.view', 'inventory.update',
+    'procurement.view', 'procurement.create', 'procurement.receive',
+    'employees.view', 'employees.manage',
+    'attendance.view', 'attendance.approve',
+    'invoices.view', 'invoices.create', 'finance.view', 'reports.view',
+    'workflows.manage', 'team.manage',
+  ],
+  ACCOUNTANT: [
+    'orders.view', 'invoices.view', 'invoices.create',
+    'payments.record', 'finance.view', 'finance.create', 'reports.view',
+    'procurement.view',
+  ],
+  WORKER: [
+    'production.view', 'production.update',
+    'attendance.view',
+  ],
+  AGENCY_ADMIN: [
+    'employees.view', 'employees.manage',
+    'attendance.view', 'attendance.approve', 'attendance.dispute',
+  ],
+  AGENCY_SUPERVISOR: [
+    'employees.view',
+    'attendance.view', 'attendance.approve', 'attendance.dispute',
+  ],
+  CA: [
+    'finance.view', 'invoices.view', 'reports.view',
+  ],
+};
+
+/**
  * Pre-made role templates so admins don't start from scratch.
  */
 export const ROLE_TEMPLATES: Array<{

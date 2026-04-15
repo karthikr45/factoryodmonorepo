@@ -1,6 +1,7 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 interface CreateRuleInput {
   name: string;
@@ -14,9 +15,99 @@ interface CreateRuleInput {
   priority?: number;
 }
 
+export interface FireEventInput {
+  /** Enum value from ApprovalTriggerType, e.g. 'PURCHASE_ORDER', 'PAYMENT_OUT'. */
+  triggerType: string;
+  /** The kind of record the approval is attached to, e.g. 'ORDER', 'PO', 'PAYROLL'. */
+  subjectType: string;
+  /** The id of that record. */
+  subjectId: string;
+  /** The user whose action triggered the check. */
+  requestedBy: string;
+  /** The numeric value the rule is evaluated against (e.g. PO total in paise, overtime hours). */
+  fieldValue: number;
+  /** Anything the approver UI should show — description, amount, party name, etc. */
+  metadata?: Record<string, unknown>;
+}
+
+export interface FireEventResult {
+  /** True if at least one active rule matched. Caller should pause the operation. */
+  requiresApproval: boolean;
+  /** IDs of pending approval requests created. Empty when requiresApproval=false. */
+  requestIds: string[];
+}
+
 @Injectable()
 export class ApprovalsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ApprovalsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
+
+  /**
+   * Evaluate all active rules for an orgId+triggerType and, if any match the
+   * supplied fieldValue, create ApprovalRequest row(s) and notify approvers.
+   *
+   * Callers should NOT complete the downstream action (dispatching the order,
+   * paying the PO, etc.) when requiresApproval is true. They should instead
+   * mark the record PENDING_APPROVAL and unlock it once act() is called.
+   */
+  async fireEvent(orgId: string, input: FireEventInput): Promise<FireEventResult> {
+    const rules = await this.prisma.client.approvalRule.findMany({
+      where: { orgId, triggerType: input.triggerType as never, isActive: true },
+      orderBy: { priority: 'asc' },
+    });
+    const matched = rules.filter((r) => this.matches(r.conditionOp, r.conditionValue, input.fieldValue));
+    if (matched.length === 0) return { requiresApproval: false, requestIds: [] };
+
+    const requestIds: string[] = [];
+    for (const rule of matched) {
+      const expiresAt = rule.slaHours ? new Date(Date.now() + rule.slaHours * 3_600_000) : null;
+      const req = await this.prisma.client.approvalRequest.create({
+        data: {
+          orgId,
+          ruleId: rule.id,
+          triggerType: input.triggerType as never,
+          subjectType: input.subjectType,
+          subjectId: input.subjectId,
+          requestedBy: input.requestedBy,
+          status: 'PENDING',
+          currentLevel: 0,
+          expiresAt,
+          metadata: (input.metadata ?? {}) as never,
+        },
+      });
+      requestIds.push(req.id);
+
+      // Notify approvers. approverRoleIds holds CustomRole ids — find users
+      // assigned to those roles (or fall back to OWNER users).
+      const approverRoleIds = (rule.approverRoleIds as string[]) ?? [];
+      const approvers = approverRoleIds.length
+        ? await this.prisma.client.user.findMany({
+            where: { orgId, customRoleId: { in: approverRoleIds }, isActive: true },
+            select: { id: true },
+          })
+        : await this.prisma.client.user.findMany({
+            where: { orgId, role: 'OWNER', isActive: true },
+            select: { id: true },
+          });
+
+      for (const a of approvers) {
+        await this.notifications.notifyUser({
+          userId: a.id,
+          orgId,
+          type: 'GENERIC',
+          title: `Approval needed: ${rule.name}`,
+          body: `${input.subjectType} ${input.subjectId} is pending your approval.`,
+          metadata: { approvalRequestId: req.id, subjectType: input.subjectType, subjectId: input.subjectId },
+        }).catch((e: unknown) => this.logger.warn(`notifyUser failed: ${String(e)}`));
+      }
+    }
+
+    return { requiresApproval: true, requestIds };
+  }
 
   // ---- Rules ----
   async listRules(orgId: string): Promise<Array<{

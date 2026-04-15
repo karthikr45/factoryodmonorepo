@@ -29,6 +29,7 @@ import {
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator';
 import { OrgId } from '../../common/decorators/org-id.decorator';
+import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 
 import { CustomersService } from './customers.service';
@@ -123,6 +124,7 @@ export class OrdersController {
   }
 
   @Post('orders')
+  @RequirePermissions('orders.create')
   @UsePipes(new ZodValidationPipe(createOrderSchema))
   async createOrder(
     @OrgId() orgId: string,
@@ -133,6 +135,7 @@ export class OrdersController {
   }
 
   @Post('orders/with-customer')
+  @RequirePermissions('orders.create')
   @ApiOperation({ summary: 'Create order + customer (if new) in one atomic transaction' })
   async createOrderWithCustomer(
     @OrgId() orgId: string,
@@ -143,6 +146,7 @@ export class OrdersController {
   }
 
   @Patch('orders/:id')
+  @RequirePermissions('orders.edit')
   @UsePipes(new ZodValidationPipe(updateOrderSchema))
   async updateOrder(
     @OrgId() orgId: string,
@@ -164,6 +168,7 @@ export class OrdersController {
   }
 
   @Post('orders/:id/payments')
+  @RequirePermissions('payments.record')
   async recordPayment(
     @OrgId() orgId: string,
     @Param('id') id: string,

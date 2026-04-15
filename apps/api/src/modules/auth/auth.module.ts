@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 
 import { JwtGuard } from '../../common/guards/jwt.guard';
+import { InvitationsModule } from '../invitations/invitations.module';
 
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -17,6 +18,7 @@ import { TwilioService } from './twilio.service';
       secret: process.env.JWT_SECRET ?? 'dev-secret-change-me',
       signOptions: { expiresIn: process.env.JWT_EXPIRES_IN ?? '15m' },
     }),
+    InvitationsModule,
   ],
   controllers: [AuthController],
   providers: [

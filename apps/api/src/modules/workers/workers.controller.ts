@@ -2,13 +2,16 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Patch,
   Post,
   Query,
+  Res,
   UsePipes,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 
 import {
   createWorkerSchema,
@@ -108,5 +111,18 @@ export class WorkersController {
     @Param('id') id: string,
   ): ReturnType<WorkersService['markPayrollPaid']> {
     return this.workersService.markPayrollPaid(orgId, id);
+  }
+
+  @Get('payroll/:id/slip.pdf')
+  @Header('Content-Type', 'application/pdf')
+  async salarySlipPdf(
+    @OrgId() orgId: string,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { buffer, filename } = await this.workersService.getPayrollSlipPdf(orgId, id);
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Content-Length', String(buffer.length));
+    res.end(buffer);
   }
 }

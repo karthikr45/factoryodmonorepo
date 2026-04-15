@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { AccountingService } from '../../common/accounting/accounting.service';
+import { PdfService } from '../../common/pdf/pdf.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 interface InvoiceItem { description: string; quantity: number; unit: string; unitPrice: number; gstRate: number; hsnCode?: string; }
@@ -10,7 +11,47 @@ export class InvoicesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly accounting: AccountingService,
+    private readonly pdf: PdfService,
   ) {}
+
+  async getPdf(orgId: string, id: string): Promise<{ buffer: Buffer; filename: string }> {
+    const inv = await this.prisma.client.invoice.findFirst({
+      where: { id, orgId },
+      include: {
+        customer: { select: { name: true, gstin: true, address: true, phone: true } },
+        organisation: { select: { name: true, gstin: true } },
+      },
+    });
+    if (!inv) throw new NotFoundException('Invoice not found');
+
+    const items = (inv.items as Array<InvoiceItem>).map((it) => ({
+      description: it.description,
+      quantity: it.quantity,
+      unit: it.unit,
+      unitPricePaise: it.unitPrice,
+      gstRate: it.gstRate,
+      hsnCode: it.hsnCode ?? null,
+    }));
+
+    const buffer = await this.pdf.buildInvoice({
+      org: inv.organisation,
+      invoice: {
+        number: inv.invoiceNumber,
+        date: inv.invoiceDate,
+        dueDate: inv.dueDate,
+        notes: inv.notes,
+      },
+      customer: inv.customer,
+      items,
+      summary: {
+        netPaise: Number(inv.subtotal),
+        gstPaise: Number(inv.gstAmount),
+        totalPaise: Number(inv.totalAmount),
+        paidPaise: Number(inv.paidAmount),
+      },
+    });
+    return { buffer, filename: `${inv.invoiceNumber}.pdf` };
+  }
 
   async create(orgId: string, userId: string, input: {
     orderId?: string; customerId: string; invoiceNumber: string;

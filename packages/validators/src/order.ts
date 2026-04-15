@@ -14,6 +14,7 @@ export const createOrderSchema = z.object({
   totalValue: paiseSchema,
   advancePaid: paiseSchema.default(0),
   notes: z.string().max(2000).optional().nullable(),
+  workflowTemplateId: z.string().uuid().optional(),
 });
 
 export const updateOrderSchema = createOrderSchema.partial();

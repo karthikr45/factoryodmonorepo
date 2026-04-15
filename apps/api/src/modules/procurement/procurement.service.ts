@@ -9,6 +9,7 @@ import type {
 
 import { AccountingService } from '../../common/accounting/accounting.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { ApprovalsService } from '../approvals/approvals.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 interface POItem {
@@ -25,6 +26,7 @@ export class ProcurementService {
     private readonly prisma: PrismaService,
     private readonly accounting: AccountingService,
     private readonly gateway: NotificationsGateway,
+    private readonly approvals: ApprovalsService,
   ) {}
 
   // ---- Vendors ----
@@ -138,7 +140,8 @@ export class ProcurementService {
   async createPurchaseOrder(
     orgId: string,
     input: CreatePurchaseOrderInput,
-  ): Promise<{ id: string; totalAmount: number; gstAmount: number }> {
+    userId?: string,
+  ): Promise<{ id: string; totalAmount: number; gstAmount: number; requiresApproval: boolean; approvalRequestIds: string[] }> {
     const vendor = await this.prisma.client.vendor.findFirst({
       where: { id: input.vendorId, orgId },
     });
@@ -166,10 +169,30 @@ export class ProcurementService {
         expectedDate: input.expectedDate ?? null,
       },
     });
+
+    // Fire approval rules on PO create. Rules match against total amount in rupees.
+    let approvalResult = { requiresApproval: false, requestIds: [] as string[] };
+    if (userId) {
+      approvalResult = await this.approvals.fireEvent(orgId, {
+        triggerType: 'PURCHASE_ORDER',
+        subjectType: 'PO',
+        subjectId: po.id,
+        requestedBy: userId,
+        fieldValue: Number(totalPaise) / 100, // rupees — matches how rules are configured
+        metadata: {
+          poNumber: po.poNumber,
+          vendorName: vendor.name,
+          totalRupees: Number(totalPaise) / 100,
+        },
+      });
+    }
+
     return {
       id: po.id,
       totalAmount: Number(totalPaise),
       gstAmount: Number(gstPaise),
+      requiresApproval: approvalResult.requiresApproval,
+      approvalRequestIds: approvalResult.requestIds,
     };
   }
 

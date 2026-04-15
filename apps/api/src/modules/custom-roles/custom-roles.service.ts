@@ -94,4 +94,21 @@ export class CustomRolesService {
     await this.prisma.client.customRole.delete({ where: { id } });
     return { ok: true };
   }
+
+  /**
+   * Assign a custom role to a user in the same org. Pass customRoleId=null to unset.
+   */
+  async assignToUser(orgId: string, userId: string, customRoleId: string | null): Promise<{ ok: true }> {
+    const user = await this.prisma.client.user.findFirst({ where: { id: userId, orgId } });
+    if (!user) throw new NotFoundException('User not found in this organisation');
+    if (customRoleId) {
+      const role = await this.prisma.client.customRole.findFirst({ where: { id: customRoleId, orgId } });
+      if (!role) throw new NotFoundException('Role not found');
+    }
+    await this.prisma.client.user.update({
+      where: { id: userId },
+      data: { customRoleId },
+    });
+    return { ok: true };
+  }
 }

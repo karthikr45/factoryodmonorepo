@@ -20,7 +20,9 @@ import {
   type UpdatePurchaseOrderStatusInput,
 } from '@repo/validators';
 
+import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { OrgId } from '../../common/decorators/org-id.decorator';
+import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 
 import { ProcurementService } from './procurement.service';
@@ -42,6 +44,7 @@ export class ProcurementController {
   }
 
   @Post('vendors')
+  @RequirePermissions('procurement.create')
   @UsePipes(new ZodValidationPipe(createVendorSchema))
   async createVendor(
     @OrgId() orgId: string,
@@ -69,16 +72,19 @@ export class ProcurementController {
   }
 
   @Post('purchase-orders')
+  @RequirePermissions('procurement.create')
   @ApiOperation({ summary: 'Create a new purchase order' })
   @UsePipes(new ZodValidationPipe(createPurchaseOrderSchema))
   async createPO(
     @OrgId() orgId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() body: CreatePurchaseOrderInput,
   ): ReturnType<ProcurementService['createPurchaseOrder']> {
-    return this.procurementService.createPurchaseOrder(orgId, body);
+    return this.procurementService.createPurchaseOrder(orgId, body, user.id);
   }
 
   @Patch('purchase-orders/:id/status')
+  @RequirePermissions('procurement.receive')
   @ApiOperation({ summary: 'Mark a PO received (triggers auto-journal)' })
   @UsePipes(new ZodValidationPipe(updatePurchaseOrderStatusSchema))
   async updateStatus(

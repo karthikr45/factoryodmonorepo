@@ -6,6 +6,8 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AccountingModule } from './common/accounting/accounting.module';
+import { PermissionsGuard } from './common/guards/permissions.guard';
+import { PdfModule } from './common/pdf/pdf.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { AIAssistantModule } from './modules/ai-assistant/ai-assistant.module';
 import { ApprovalsModule } from './modules/approvals/approvals.module';
@@ -58,6 +60,7 @@ import { HealthController } from './health.controller';
     // Infrastructure
     PrismaModule,
     AccountingModule,
+    PdfModule,
 
     // Auth & Org
     AuthModule,
@@ -113,6 +116,10 @@ import { HealthController } from './health.controller';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PermissionsGuard,
     },
   ],
 })

@@ -27,19 +27,35 @@ export class TwilioService {
     const auth = Buffer.from(`${this.accountSid}:${this.authToken}`).toString('base64');
     const params = new URLSearchParams({ To: phone, From: this.from, Body: body });
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${auth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params.toString(),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      this.logger.error(`Twilio send failed: ${res.status} ${text}`);
-      throw new Error('SMS delivery failed');
+    const maxAttempts = 3;
+    let lastError = '';
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            Authorization: `Basic ${auth}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+        });
+        if (res.ok) return;
+        const text = await res.text();
+        lastError = `${res.status} ${text}`;
+        // Permanent errors (bad phone number, auth): don't retry
+        if (res.status >= 400 && res.status < 500) {
+          this.logger.error(`Twilio permanent error: ${lastError}`);
+          throw new Error('SMS delivery failed (invalid number or auth)');
+        }
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+      }
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 500 * 2 ** (attempt - 1)));
+      }
     }
+
+    this.logger.error(`Twilio send failed after ${maxAttempts} attempts: ${lastError}`);
+    throw new Error('SMS delivery failed');
   }
 }

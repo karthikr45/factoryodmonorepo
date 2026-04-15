@@ -47,4 +47,13 @@ export class CustomRolesController {
   async delete(@OrgId() orgId: string, @Param('id') id: string): ReturnType<CustomRolesService['delete']> {
     return this.service.delete(orgId, id);
   }
+
+  @Put('assign/:userId')
+  async assign(
+    @OrgId() orgId: string,
+    @Param('userId') userId: string,
+    @Body() body: { customRoleId: string | null },
+  ): ReturnType<CustomRolesService['assignToUser']> {
+    return this.service.assignToUser(orgId, userId, body.customRoleId ?? null);
+  }
 }

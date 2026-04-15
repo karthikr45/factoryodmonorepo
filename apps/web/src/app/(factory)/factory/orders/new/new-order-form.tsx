@@ -12,8 +12,16 @@ interface Customer {
   phone: string;
 }
 
+interface WorkflowTemplate {
+  id: string;
+  name: string;
+  industry: string;
+  isDefault: boolean;
+}
+
 interface Props {
   customers: Customer[];
+  workflows?: WorkflowTemplate[];
 }
 
 /** Normalize various phone inputs to +91XXXXXXXXXX */
@@ -25,7 +33,7 @@ function normalizePhone(raw: string): string {
   return raw;
 }
 
-export function NewOrderForm({ customers }: Props): JSX.Element {
+export function NewOrderForm({ customers, workflows = [] }: Props): JSX.Element {
   const router = useRouter();
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', gstin: '' });
@@ -38,6 +46,9 @@ export function NewOrderForm({ customers }: Props): JSX.Element {
   const [deliveryDate, setDeliveryDate] = useState('');
   const [totalValueRupees, setTotalValueRupees] = useState('');
   const [notes, setNotes] = useState('');
+  const [workflowTemplateId, setWorkflowTemplateId] = useState<string>(
+    workflows.find((w) => w.isDefault)?.id ?? '',
+  );
 
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -77,6 +88,7 @@ export function NewOrderForm({ customers }: Props): JSX.Element {
           totalValue: Math.round(Number(totalValueRupees) * 100),
           advancePaid: 0,
           ...(notes.trim() ? { notes: notes.trim() } : {}),
+          ...(workflowTemplateId ? { workflowTemplateId } : {}),
         };
 
         if (addingCustomer) {
@@ -236,6 +248,29 @@ export function NewOrderForm({ customers }: Props): JSX.Element {
           />
         </label>
       </div>
+
+      {workflows.length > 0 ? (
+        <label className="block">
+          <span className="text-sm font-medium text-neutral-700">Production workflow</span>
+          <select
+            value={workflowTemplateId}
+            onChange={(e) => setWorkflowTemplateId(e.target.value)}
+            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+          >
+            <option value="">Use org default</option>
+            {workflows.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+                {w.isDefault ? ' (default)' : ''}
+                {w.industry && w.industry !== 'GENERAL' ? ` — ${w.industry}` : ''}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-neutral-500">
+            Job cards will be auto-generated once the order is confirmed.
+          </p>
+        </label>
+      ) : null}
 
       <label className="block">
         <span className="text-sm font-medium text-neutral-700">Notes</span>

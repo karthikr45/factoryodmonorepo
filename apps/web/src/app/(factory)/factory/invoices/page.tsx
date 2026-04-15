@@ -295,11 +295,21 @@ export default function InvoicesPage(): JSX.Element {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {inv.status !== 'PAID' && inv.status !== 'CANCELLED' && (
-                        <Button size="sm" variant="outline" onClick={() => setPaymentTarget(inv.id)} disabled={pending}>
-                          Record payment
-                        </Button>
-                      )}
+                      <div className="flex justify-end gap-2">
+                        <a
+                          href={`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/api/invoices/${inv.id}/pdf`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                        >
+                          PDF
+                        </a>
+                        {inv.status !== 'PAID' && inv.status !== 'CANCELLED' && (
+                          <Button size="sm" variant="outline" onClick={() => setPaymentTarget(inv.id)} disabled={pending}>
+                            Record payment
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

@@ -6,6 +6,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { AuthTokens, JwtPayload } from '@repo/types';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { InvitationsService } from '../invitations/invitations.service';
 
 import { TwilioService } from './twilio.service';
 
@@ -31,6 +32,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly twilio: TwilioService,
+    private readonly invitations: InvitationsService,
   ) {}
 
   /**
@@ -56,7 +58,7 @@ export class AuthService {
    * On first-time login the user is NOT yet attached to an org — caller must then
    * hit POST /organisations/onboard to create or join one.
    */
-  async verifyOtp(phone: string, code: string): Promise<VerifyOtpResult> {
+  async verifyOtp(phone: string, code: string, inviteToken?: string): Promise<VerifyOtpResult> {
     const hash = this.hashOtp(code);
     const record = await this.prisma.client.oTP.findFirst({
       where: { phone, code: hash, used: false, expiresAt: { gt: new Date() } },
@@ -72,25 +74,81 @@ export class AuthService {
       data: { used: true },
     });
 
+    // Pre-validate invite token BEFORE creating any org/user records.
+    // An invalid/expired token should not silently drop the user into a pending org.
+    let pendingInvite: { orgId: string; role: string; name: string | null } | null = null;
+    if (inviteToken) {
+      const inv = await this.prisma.client.invitation.findUnique({ where: { token: inviteToken } });
+      if (!inv) throw new UnauthorizedException('Invitation not found');
+      if (inv.status !== 'PENDING') throw new UnauthorizedException('Invitation already used or revoked');
+      if (inv.expiresAt < new Date()) {
+        await this.prisma.client.invitation.update({ where: { id: inv.id }, data: { status: 'EXPIRED' } });
+        throw new UnauthorizedException('Invitation has expired');
+      }
+      if (inv.type !== 'TEAM_MEMBER') {
+        // Org-relationship invites don't create users; handled separately.
+        throw new UnauthorizedException('This invitation link is not for signup');
+      }
+      pendingInvite = {
+        orgId: inv.orgId,
+        role: inv.inviteeRole ?? 'WORKER',
+        name: inv.inviteeName,
+      };
+    }
+
     let user = await this.prisma.client.user.findUnique({ where: { phone } });
+    let isNewUser = false;
     if (!user) {
-      // Unregistered phone: create a placeholder user with no org yet.
-      // They will complete onboarding next.
-      const placeholderOrg = await this.prisma.client.organisation.create({
+      isNewUser = true;
+      if (pendingInvite) {
+        // Invited user: create directly in the inviting org.
+        user = await this.prisma.client.user.create({
+          data: {
+            orgId: pendingInvite.orgId,
+            name: pendingInvite.name ?? `User ${phone.slice(-4)}`,
+            phone,
+            role: pendingInvite.role as never,
+          },
+        });
+      } else {
+        // Unregistered phone with no invite: create a placeholder org.
+        // They will complete onboarding next.
+        const placeholderOrg = await this.prisma.client.organisation.create({
+          data: {
+            name: `Pending ${phone.slice(-4)}`,
+            type: 'FACTORY',
+            plan: 'FREE',
+            isActive: false,
+          },
+        });
+        user = await this.prisma.client.user.create({
+          data: {
+            orgId: placeholderOrg.id,
+            name: `User ${phone.slice(-4)}`,
+            phone,
+            role: 'OWNER',
+          },
+        });
+      }
+    }
+
+    // If an existing user is redeeming a team invite, move them to the inviting org.
+    if (pendingInvite && !isNewUser) {
+      user = await this.prisma.client.user.update({
+        where: { id: user.id },
         data: {
-          name: `Pending ${phone.slice(-4)}`,
-          type: 'FACTORY',
-          plan: 'FREE',
-          isActive: false,
+          orgId: pendingInvite.orgId,
+          role: pendingInvite.role as never,
+          ...(pendingInvite.name ? { name: pendingInvite.name } : {}),
         },
       });
-      user = await this.prisma.client.user.create({
-        data: {
-          orgId: placeholderOrg.id,
-          name: `User ${phone.slice(-4)}`,
-          phone,
-          role: 'OWNER',
-        },
+    }
+
+    // Mark the invitation ACCEPTED (after user is guaranteed to exist).
+    if (pendingInvite && inviteToken) {
+      await this.prisma.client.invitation.update({
+        where: { token: inviteToken },
+        data: { status: 'ACCEPTED', acceptedAt: new Date(), acceptedBy: user.id },
       });
     }
 

@@ -52,7 +52,7 @@ export class AuthController {
   async verifyOtp(
     @Body() body: VerifyOtpInput,
   ): ReturnType<AuthService['verifyOtp']> {
-    return this.authService.verifyOtp(body.phone, body.code);
+    return this.authService.verifyOtp(body.phone, body.code, body.inviteToken);
   }
 
   @Public()

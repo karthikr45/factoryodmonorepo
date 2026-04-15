@@ -31,37 +31,12 @@ export class WhatsAppService {
       return { id: record.id };
     }
 
-    try {
-      const res = await fetch(
-        `https://graph.facebook.com/v18.0/${this.phoneNumberId}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${this.token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            to: phone.replace('+', ''),
-            type: 'text',
-            text: { body: message },
-          }),
-        },
-      );
-      const data = await res.json() as { messages?: Array<{ id: string }> };
-      const waId = data.messages?.[0]?.id;
-
-      await this.prisma.client.whatsAppMessage.update({
-        where: { id: record.id },
-        data: { status: 'SENT', sentAt: new Date(), waMessageId: waId ?? null },
-      });
-    } catch (err) {
-      this.logger.error(`WhatsApp send failed: ${err}`);
-      await this.prisma.client.whatsAppMessage.update({
-        where: { id: record.id },
-        data: { status: 'FAILED' },
-      });
-    }
+    await this.postToMeta(record.id, {
+      messaging_product: 'whatsapp',
+      to: phone.replace('+', ''),
+      type: 'text',
+      text: { body: message },
+    });
 
     return { id: record.id };
   }
@@ -75,15 +50,82 @@ export class WhatsAppService {
       },
     });
 
-    if (!this.token) {
+    if (!this.token || !this.phoneNumberId) {
       this.logger.warn(`[DEV] WhatsApp template to ${phone}: ${templateName} ${JSON.stringify(params)}`);
       await this.prisma.client.whatsAppMessage.update({
         where: { id: record.id },
         data: { status: 'SENT', sentAt: new Date() },
       });
+      return { id: record.id };
     }
 
+    // Meta template send: parameters passed in `components`, positional.
+    const components = [
+      {
+        type: 'body',
+        parameters: Object.values(params).map((text) => ({ type: 'text', text })),
+      },
+    ];
+    await this.postToMeta(record.id, {
+      messaging_product: 'whatsapp',
+      to: phone.replace('+', ''),
+      type: 'template',
+      template: {
+        name: templateName,
+        language: { code: 'en' },
+        components,
+      },
+    });
+
     return { id: record.id };
+  }
+
+  /**
+   * Send one payload to Meta Cloud API with up to 3 retries on transient
+   * failures. Updates the WhatsAppMessage row in the DB with final status.
+   */
+  private async postToMeta(messageRowId: string, payload: unknown): Promise<void> {
+    const url = `https://graph.facebook.com/v18.0/${this.phoneNumberId}/messages`;
+    const maxAttempts = 3;
+    let lastError = '';
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          const data = (await res.json()) as { messages?: Array<{ id: string }> };
+          const waId = data.messages?.[0]?.id;
+          await this.prisma.client.whatsAppMessage.update({
+            where: { id: messageRowId },
+            data: { status: 'SENT', sentAt: new Date(), waMessageId: waId ?? null },
+          });
+          return;
+        }
+
+        // 4xx = don't retry (permanent error — invalid phone, template not approved etc.)
+        const text = await res.text();
+        lastError = `${res.status} ${text}`;
+        if (res.status >= 400 && res.status < 500) break;
+      } catch (err) {
+        lastError = String(err);
+      }
+      // Exponential backoff on retry
+      if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, 500 * 2 ** (attempt - 1)));
+    }
+
+    this.logger.error(`WhatsApp send failed after ${maxAttempts} attempts: ${lastError}`);
+    await this.prisma.client.whatsAppMessage.update({
+      where: { id: messageRowId },
+      data: { status: 'FAILED', metadata: { error: lastError } as never },
+    });
   }
 
   // Convenience methods for common business messages

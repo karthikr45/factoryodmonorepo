@@ -9,6 +9,7 @@ export const requestOtpSchema = z.object({
 export const verifyOtpSchema = z.object({
   phone: indianPhoneSchema,
   code: otpCodeSchema,
+  inviteToken: z.string().min(10).max(128).optional(),
 });
 
 export const refreshTokenSchema = z.object({

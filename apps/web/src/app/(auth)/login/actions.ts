@@ -34,9 +34,11 @@ export async function requestOtpAction(formData: FormData): Promise<ActionResult
 }
 
 export async function verifyOtpAction(formData: FormData): Promise<ActionResult> {
+  const inviteToken = formData.get('inviteToken');
   const parsed = verifyOtpSchema.safeParse({
     phone: formData.get('phone'),
     code: formData.get('code'),
+    ...(inviteToken ? { inviteToken: String(inviteToken) } : {}),
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid code' };
