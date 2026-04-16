@@ -66,7 +66,7 @@ export default function ReportsPage(): JSX.Element {
           </div>
 
           {cashFlow.daily.length > 0 && (
-            <div className="mt-4 overflow-hidden rounded-lg border border-neutral-200 bg-white">
+            <div className="mt-4 overflow-x-auto rounded-lg border border-neutral-200 bg-white">
               <table className="w-full text-sm">
                 <thead className="bg-neutral-50 text-left"><tr>
                   <th className="px-4 py-2 font-medium">Date</th>
@@ -93,7 +93,7 @@ export default function ReportsPage(): JSX.Element {
       {/* Profit per order */}
       <div className="mt-8">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">Profit per order</h2>
-        <div className="mt-3 overflow-hidden rounded-lg border border-neutral-200 bg-white">
+        <div className="mt-3 overflow-x-auto rounded-lg border border-neutral-200 bg-white">
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-left"><tr>
               <th className="px-4 py-3 font-medium">Order</th>

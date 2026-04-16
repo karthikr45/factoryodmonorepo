@@ -28,6 +28,59 @@ enum OrganisationType {
 enum OrganisationPlan {
   FREE
   PRO
+  GROWTH
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+model Subscription {
+  id                String             @id @default(uuid())
+  orgId             String             @unique
+  plan              OrganisationPlan
+  status            SubscriptionStatus @default(TRIALING)
+  // Razorpay identifiers — null for manually-managed plans (e.g. enterprise wires).
+  rzpCustomerId     String?
+  rzpSubscriptionId String?            @unique
+  rzpPlanId         String?
+  amountPaise       BigInt             @default(0)
+  intervalMonths    Int                @default(1)
+  trialEndsAt       DateTime?
+  currentPeriodEnd  DateTime?
+  cancelledAt       DateTime?
+  metadata          Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  organisation Organisation     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  payments     SubscriptionPayment[]
+
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model SubscriptionPayment {
+  id              String   @id @default(uuid())
+  subscriptionId  String
+  rzpPaymentId    String?  @unique
+  rzpInvoiceId    String?
+  amountPaise     BigInt
+  status          String   // captured / failed / refunded
+  paidAt          DateTime?
+  failureReason   String?
+  rawPayload      Json?
+  createdAt       DateTime @default(now())
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId, createdAt])
+  @@map("subscription_payments")
 }
 
 enum UserRole {
@@ -188,6 +241,7 @@ model Organisation {
   approvalRules     ApprovalRule[]
   approvalRequests  ApprovalRequest[]
   aiInteractions    AIInteraction[]
+  subscription      Subscription?
 
   @@index([type])
   @@index([isActive])

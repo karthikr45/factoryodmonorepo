@@ -11,6 +11,8 @@ const nav = [
   { href: '/factory/workflows', label: 'Workflows' },
   { href: '/factory/roles', label: 'Roles' },
   { href: '/factory/approvals', label: 'Approvals' },
+  { href: '/factory/imports', label: 'Imports' },
+  { href: '/factory/billing', label: 'Billing' },
   { href: '/factory/settings', label: 'Settings' },
 ];
 

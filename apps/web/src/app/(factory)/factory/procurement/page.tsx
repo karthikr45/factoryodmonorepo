@@ -116,7 +116,7 @@ export default function ProcurementPage(): JSX.Element {
 
       {/* Vendors tab */}
       {tab === 'vendors' && (
-        <div className="mt-6 overflow-hidden rounded-lg border border-neutral-200 bg-white">
+        <div className="mt-6 overflow-x-auto rounded-lg border border-neutral-200 bg-white">
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-left"><tr>
               <th className="px-4 py-3 font-medium">Name</th>
@@ -142,7 +142,7 @@ export default function ProcurementPage(): JSX.Element {
 
       {/* Purchase Orders tab */}
       {tab === 'orders' && (
-        <div className="mt-6 overflow-hidden rounded-lg border border-neutral-200 bg-white">
+        <div className="mt-6 overflow-x-auto rounded-lg border border-neutral-200 bg-white">
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-left"><tr>
               <th className="px-4 py-3 font-medium">PO #</th>

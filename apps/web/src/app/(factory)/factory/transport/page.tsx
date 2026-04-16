@@ -161,7 +161,7 @@ export default function TransportPage(): JSX.Element {
       {loadingDispatches ? (
         <div className="mt-12 text-center text-neutral-500">Loading...</div>
       ) : (
-        <div className="mt-6 overflow-hidden rounded-lg border border-neutral-200 bg-white">
+        <div className="mt-6 overflow-x-auto rounded-lg border border-neutral-200 bg-white">
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-left text-neutral-600">
               <tr>
@@ -243,7 +243,7 @@ export default function TransportPage(): JSX.Element {
         {loadingTransporters ? (
           <div className="mt-6 text-center text-neutral-500">Loading...</div>
         ) : (
-          <div className="mt-4 overflow-hidden rounded-lg border border-neutral-200 bg-white">
+          <div className="mt-4 overflow-x-auto rounded-lg border border-neutral-200 bg-white">
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-left text-neutral-600">
                 <tr>

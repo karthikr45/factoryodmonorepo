@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { GSTReturnType } from '@repo/types';
 import type { GenerateGstReturnInput } from '@repo/validators';
 
 import { LEDGER } from '../../common/accounting/ledger-codes';
 import { PrismaService } from '../../common/prisma/prisma.service';
+
+import { getGspProvider } from './gsp-provider';
 
 interface Gstr1Summary {
   period: string;
@@ -101,6 +103,100 @@ export class ComplianceService {
       data: { status: 'FILED', filedAt: new Date(), filedBy: userId },
     });
     return { id };
+  }
+
+  /**
+   * Push a generated return to the GSP. Updates status to FILED on success
+   * and stores the acknowledgement number returned by the portal.
+   */
+  async fileWithGsp(orgId: string, id: string, userId: string): Promise<{
+    id: string;
+    acknowledgmentNumber: string;
+    filedAt: Date;
+    provider: string;
+  }> {
+    const r = await this.prisma.client.gSTReturn.findFirst({
+      where: { id, orgId },
+      include: { organisation: { select: { gstin: true } } },
+    });
+    if (!r) throw new NotFoundException('Return not found');
+    if (!r.organisation.gstin) throw new BadRequestException('Org has no GSTIN — set it before filing');
+    if (r.status === 'FILED') throw new BadRequestException('Return is already filed');
+
+    const provider = getGspProvider();
+    const result = r.type === GSTReturnType.GSTR1
+      ? await provider.pushGstr1(r.organisation.gstin, r.period, r.data)
+      : await provider.pushGstr3b(r.organisation.gstin, r.period, r.data);
+
+    await this.prisma.client.gSTReturn.update({
+      where: { id },
+      data: {
+        status: 'FILED',
+        filedAt: result.filedAt,
+        filedBy: userId,
+        // Stash the ack number + provider payload back into the data blob so
+        // CAs can audit who pushed what when.
+        data: { ...(r.data as Record<string, unknown>), gspResult: result } as never,
+      },
+    });
+
+    return { id, acknowledgmentNumber: result.acknowledgmentNumber, filedAt: result.filedAt, provider: provider.name };
+  }
+
+  /**
+   * Generate an e-invoice (IRN + QR) for a single sales invoice via the
+   * configured IRP. Stores the IRN on the Invoice row.
+   */
+  async generateEInvoice(orgId: string, invoiceId: string): Promise<{
+    invoiceId: string;
+    irn: string;
+    ackNumber: string;
+    qrCode: string;
+  }> {
+    const inv = await this.prisma.client.invoice.findFirst({
+      where: { id: invoiceId, orgId },
+      include: {
+        customer: { select: { gstin: true } },
+        organisation: { select: { gstin: true } },
+      },
+    });
+    if (!inv) throw new NotFoundException('Invoice not found');
+    if (!inv.organisation.gstin) throw new BadRequestException('Org has no GSTIN');
+
+    const items = (inv.items as Array<{ description: string; quantity: number; unit: string; unitPrice: number; gstRate: number; hsnCode?: string | null }>).map((it) => ({
+      description: it.description,
+      hsnCode: it.hsnCode ?? null,
+      quantity: it.quantity,
+      unit: it.unit,
+      unitPricePaise: it.unitPrice,
+      gstRate: it.gstRate,
+    }));
+
+    const provider = getGspProvider();
+    const result = await provider.generateEInvoice({
+      invoiceNumber: inv.invoiceNumber,
+      invoiceDate: inv.invoiceDate,
+      sellerGstin: inv.organisation.gstin,
+      buyerGstin: inv.customer.gstin,
+      totalPaise: Number(inv.totalAmount),
+      gstPaise: Number(inv.gstAmount),
+      items,
+    });
+
+    await this.prisma.client.invoice.update({
+      where: { id: inv.id },
+      data: {
+        einvoiceJson: {
+          irn: result.irn,
+          ackNumber: result.ackNumber,
+          ackDate: result.ackDate,
+          qrCode: result.qrCode,
+          provider: provider.name,
+        } as never,
+      },
+    });
+
+    return { invoiceId: inv.id, irn: result.irn, ackNumber: result.ackNumber, qrCode: result.qrCode };
   }
 
   // -----------------------------------------------------------------

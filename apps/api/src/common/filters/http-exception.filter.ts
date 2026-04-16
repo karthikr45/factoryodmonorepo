@@ -10,6 +10,8 @@ import { Request, Response } from 'express';
 
 import type { ErrorResponse } from '@repo/types';
 
+import { captureException } from '../observability/sentry';
+
 /**
  * Global exception filter.
  * Wraps every thrown error in an ErrorResponse envelope. User-friendly messages
@@ -42,6 +44,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     } else if (exception instanceof Error) {
       this.logger.error(exception.message, exception.stack);
+    }
+
+    // Anything 5xx or unknown is real server-side breakage — ship to Sentry.
+    if (status >= 500) {
+      captureException(exception, {
+        method: req.method,
+        url: req.url,
+        statusCode: status,
+        code,
+      });
     }
 
     const body: ErrorResponse = {

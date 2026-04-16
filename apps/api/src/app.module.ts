@@ -13,6 +13,7 @@ import { AIAssistantModule } from './modules/ai-assistant/ai-assistant.module';
 import { ApprovalsModule } from './modules/approvals/approvals.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { BillingModule } from './modules/billing/billing.module';
 import { BomModule } from './modules/bom/bom.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { CheckInModule } from './modules/check-in/check-in.module';
@@ -20,6 +21,7 @@ import { ComplianceModule } from './modules/compliance/compliance.module';
 import { ContentModule } from './modules/content/content.module';
 import { CustomRolesModule } from './modules/custom-roles/custom-roles.module';
 import { FilesModule } from './modules/files/files.module';
+import { ImportsModule } from './modules/imports/imports.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { InvitationsModule } from './modules/invitations/invitations.module';
@@ -68,6 +70,7 @@ import { HealthController } from './health.controller';
     InvitationsModule,
     RelationshipsModule,
     SuperAdminModule,
+    BillingModule,
 
     // Core operations
     OrdersModule,
@@ -78,6 +81,7 @@ import { HealthController } from './health.controller';
 
     // Sprint 1: Files, Check-in, Inventory, QC
     FilesModule,
+    ImportsModule,
     CheckInModule,
     InventoryModule,
     QualityCheckModule,

@@ -85,7 +85,7 @@ export default function FinancePage(): JSX.Element {
 
       {/* Journal entries */}
       {tab === 'journal' && (
-        <div className="mt-6 overflow-hidden rounded-lg border border-neutral-200 bg-white">
+        <div className="mt-6 overflow-x-auto rounded-lg border border-neutral-200 bg-white">
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-left"><tr>
               <th className="px-4 py-3 font-medium">Date</th>
@@ -128,7 +128,7 @@ export default function FinancePage(): JSX.Element {
             const rows = tb.filter((r) => r.type === type);
             if (rows.length === 0) return null;
             return (
-              <div key={type} className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+              <div key={type} className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
                 <div className="bg-neutral-50 px-4 py-2 text-sm font-semibold uppercase tracking-wider text-neutral-600">{type}</div>
                 <table className="w-full text-sm">
                   <thead className="text-left text-neutral-600"><tr>
@@ -178,7 +178,7 @@ export default function FinancePage(): JSX.Element {
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+            <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
               <div className="bg-success-50 px-4 py-2 text-sm font-semibold uppercase text-success-700">Income</div>
               <table className="w-full text-sm">
                 <tbody className="divide-y divide-neutral-100">
@@ -189,7 +189,7 @@ export default function FinancePage(): JSX.Element {
                 </tbody>
               </table>
             </div>
-            <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+            <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
               <div className="bg-danger-50 px-4 py-2 text-sm font-semibold uppercase text-danger-700">Expenses</div>
               <table className="w-full text-sm">
                 <tbody className="divide-y divide-neutral-100">

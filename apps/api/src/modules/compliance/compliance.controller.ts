@@ -43,4 +43,23 @@ export class ComplianceController {
   ): ReturnType<ComplianceService['markFiled']> {
     return this.complianceService.markFiled(orgId, id, user.id);
   }
+
+  @Post('gst-returns/:id/file-with-gsp')
+  @ApiOperation({ summary: 'Push the return to the configured GSP (Cleartax/IRIS) and mark FILED on success' })
+  async fileWithGsp(
+    @OrgId() orgId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): ReturnType<ComplianceService['fileWithGsp']> {
+    return this.complianceService.fileWithGsp(orgId, id, user.id);
+  }
+
+  @Post('einvoice/:invoiceId/generate')
+  @ApiOperation({ summary: 'Generate an IRN + QR for a sales invoice via the IRP' })
+  async generateEInvoice(
+    @OrgId() orgId: string,
+    @Param('invoiceId') invoiceId: string,
+  ): ReturnType<ComplianceService['generateEInvoice']> {
+    return this.complianceService.generateEInvoice(orgId, invoiceId);
+  }
 }
