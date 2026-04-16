@@ -317,6 +317,16 @@ model JobCard {
   notes          String?
   estimatedHours Float?
 
+  // Workflow stage metadata (populated when generated from a WorkflowTemplate).
+  // Stored as plain fields rather than a relation so the data survives even if
+  // the template is later deleted or edited.
+  workflowStageId String?
+  stageSequence   Int?
+  parallelGroupId String?
+  qcRequired      Boolean  @default(false)
+  qcChecklist     Json?
+  slaHours        Float?
+
   order         Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
   department    Department     @relation(fields: [departmentId], references: [id])
   organisation  Organisation   @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -325,6 +335,7 @@ model JobCard {
 
   @@index([orgId])
   @@index([orderId])
+  @@index([orderId, stageSequence])
   @@index([departmentId, status])
   @@map("job_cards")
 }

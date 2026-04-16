@@ -8,6 +8,7 @@ export interface EmployeeView {
   name: string;
   phone: string;
   role: string;
+  customRoleId: string | null;
   department: string | null;
   designation: string | null;
   dailyRateOrSalary: number;
@@ -39,6 +40,7 @@ export class EmployeesService {
       name: u.name,
       phone: u.phone,
       role: u.role,
+      customRoleId: u.customRoleId ?? null,
       department: u.employeeProfile?.department?.name ?? null,
       designation: u.employeeProfile?.designation ?? u.role,
       dailyRateOrSalary: Number(u.employeeProfile?.monthlySalary ?? 0),
@@ -61,6 +63,7 @@ export class EmployeesService {
       name: d.worker.name,
       phone: d.worker.phone,
       role: 'CONTRACT',
+      customRoleId: null,
       department: null,
       designation: `${d.worker.skill} (${d.worker.agency.name})`,
       dailyRateOrSalary: Number(d.worker.dailyRate),

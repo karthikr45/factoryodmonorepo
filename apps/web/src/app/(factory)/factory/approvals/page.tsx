@@ -193,34 +193,78 @@ function RulesList({ rules, roles, onEdit, onDelete }: {
 }
 
 function PendingApprovals(): JSX.Element {
+  const qc = useQueryClient();
+  const [pending, start] = useTransition();
+  const [toast, setToast] = useState<string | null>(null);
   const { data } = useQuery<Array<{
-    id: string; triggerType: string; subjectType: string;
-    requesterName: string | null; createdAt: string; metadata: unknown;
+    id: string; triggerType: string; subjectType: string; subjectId: string;
+    requesterName: string | null; createdAt: string;
+    metadata: Record<string, unknown> | null;
   }>>({
     queryKey: ['pending-approvals'],
     queryFn: () => apiCall({ url: '/approvals/pending' }),
   });
 
+  const act = (id: string, action: 'APPROVE' | 'REJECT'): void => {
+    const notes = action === 'REJECT' ? (prompt('Reason for rejection?') ?? '') : undefined;
+    start(async () => {
+      try {
+        const res = await apiCall<{ status: string; resumed?: boolean; resumeError?: string }>({
+          url: `/approvals/${id}/act`,
+          method: 'POST',
+          data: { action, notes },
+        });
+        const msg = action === 'APPROVE'
+          ? (res.resumed ? 'Approved — original action completed' : (res.resumeError ? `Approved but resume failed: ${res.resumeError}` : 'Approved'))
+          : 'Rejected';
+        setToast(msg);
+        qc.invalidateQueries({ queryKey: ['pending-approvals'] });
+      } catch (err) {
+        setToast(err instanceof Error ? err.message : 'Action failed');
+      }
+    });
+  };
+
   if (!data || data.length === 0) {
     return (
-      <div className="mt-8 rounded-2xl border border-success-200 bg-success-50 p-12 text-center">
-        <div className="text-4xl">✅</div>
-        <h2 className="mt-4 text-xl font-semibold text-success-800">All caught up</h2>
-        <p className="mt-1 text-sm text-success-700">No pending approvals right now</p>
+      <div>
+        {toast && <div className="mt-4 rounded-md bg-success-50 px-4 py-2 text-sm text-success-700">{toast}</div>}
+        <div className="mt-8 rounded-2xl border border-success-200 bg-success-50 p-12 text-center">
+          <div className="text-4xl">✅</div>
+          <h2 className="mt-4 text-xl font-semibold text-success-800">All caught up</h2>
+          <p className="mt-1 text-sm text-success-700">No pending approvals right now</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mt-6 space-y-3">
-      {data.map((r) => (
-        <div key={r.id} className="rounded-2xl border border-warning-200 bg-warning-50 p-5">
-          <div className="font-semibold text-warning-900">{r.triggerType.replace('_', ' ')}</div>
-          <div className="mt-1 text-sm text-warning-800">
-            Requested by {r.requesterName ?? 'unknown'} on {new Date(r.createdAt).toLocaleString('en-IN')}
-          </div>
-        </div>
-      ))}
+    <div>
+      {toast && <div className="mt-4 rounded-md bg-success-50 px-4 py-2 text-sm text-success-700">{toast}</div>}
+      <div className="mt-6 space-y-3">
+        {data.map((r) => {
+          const meta = r.metadata ?? {};
+          const summary = Object.entries(meta)
+            .filter(([k]) => !['_id', '__v'].includes(k))
+            .map(([k, v]) => `${k}: ${String(v)}`)
+            .join(' · ');
+          return (
+            <div key={r.id} className="flex items-start justify-between gap-4 rounded-2xl border border-warning-200 bg-warning-50 p-5">
+              <div className="flex-1">
+                <div className="font-semibold text-warning-900">{r.triggerType.replace(/_/g, ' ')}</div>
+                <div className="mt-1 text-sm text-warning-800">
+                  {r.subjectType} · Requested by {r.requesterName ?? 'unknown'} on {new Date(r.createdAt).toLocaleString('en-IN')}
+                </div>
+                {summary && <div className="mt-1 text-xs text-warning-700">{summary}</div>}
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => act(r.id, 'APPROVE')} disabled={pending}>Approve</Button>
+                <Button size="sm" variant="danger" onClick={() => act(r.id, 'REJECT')} disabled={pending}>Reject</Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

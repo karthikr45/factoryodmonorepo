@@ -134,9 +134,19 @@ export default function PayrollPage(): JSX.Element {
                     }`}>{r.status}</span>
                   </td>
                   <td className="px-4 py-3">
-                    {r.status !== 'PAID' && (
-                      <Button size="sm" onClick={() => markPaid(r.id)} disabled={pending}>Pay</Button>
-                    )}
+                    <div className="flex items-center justify-end gap-2">
+                      <a
+                        href={`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/api/workers/payroll/${r.id}/slip.pdf`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                      >
+                        Slip
+                      </a>
+                      {r.status !== 'PAID' && (
+                        <Button size="sm" onClick={() => markPaid(r.id)} disabled={pending}>Pay</Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

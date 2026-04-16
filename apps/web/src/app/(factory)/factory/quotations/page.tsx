@@ -233,6 +233,14 @@ export default function QuotationsPage(): JSX.Element {
                       <div className="text-xs text-neutral-400">Valid until {formatIST(q.validUntil)}</div>
                     </div>
                     <div className="flex items-center gap-1">
+                      <a
+                        href={`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/api/quotations/${q.id}/pdf`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                      >
+                        PDF
+                      </a>
                       {q.status === 'DRAFT' && (
                         <Button size="sm" variant="outline" onClick={() => updateStatus(q.id, 'SENT')} disabled={pending}>
                           Send

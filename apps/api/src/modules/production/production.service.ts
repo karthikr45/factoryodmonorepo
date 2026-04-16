@@ -236,46 +236,108 @@ export class ProductionService {
       },
     });
 
-    // When a job card completes, check whether this was the last one for the order.
-    if (input.status === 'COMPLETED') {
-      const remaining = await this.prisma.client.jobCard.count({
-        where: { orderId: jc.orderId, status: { not: 'COMPLETED' } },
+    // Block COMPLETED if a QC stage hasn't been performed yet.
+    if (input.status === 'COMPLETED' && jc.qcRequired) {
+      const passed = await this.prisma.client.qualityCheck.count({
+        where: { jobCardId: id, status: 'PASSED' as never },
       });
-      if (remaining === 0) {
-        await this.prisma.client.order.update({
-          where: { id: jc.orderId },
-          data: { status: 'QUALITY_CHECK' },
+      if (passed === 0) {
+        // Roll back the optimistic update.
+        await this.prisma.client.jobCard.update({
+          where: { id },
+          data: { status: jc.status, completedAt: jc.completedAt },
         });
-        this.gateway.emitToOrg(orgId, 'order:status_changed', {
-          id: jc.orderId,
-          status: OrderStatus.QUALITY_CHECK,
-        });
-      } else {
-        // Find the next department and notify its manager
-        const next = await this.prisma.client.jobCard.findFirst({
-          where: { orderId: jc.orderId, status: 'PENDING' },
-          orderBy: { department: { sequence: 'asc' } },
-          include: { department: true },
-        });
-        if (next?.department.managerId) {
-          await this.notifications.notifyUser({
-            userId: next.department.managerId,
-            orgId,
-            type: 'JOBCARD_COMPLETED',
-            title: `${jc.department.name} complete on ${jc.order.orderNumber}`,
-            body: `Ready to start ${next.department.name}`,
-            metadata: { orderId: jc.orderId, nextJobCardId: next.id },
-          });
-        }
+        throw new BadRequestException('This stage requires a passed QC before it can be completed');
       }
+    }
 
-      this.gateway.emitToOrg(orgId, 'jobcard:completed', {
-        id,
-        orderId: jc.orderId,
-        departmentId: jc.departmentId,
-      });
+    // When a job card completes, advance the workflow.
+    if (input.status === 'COMPLETED') {
+      await this.advanceWorkflow(orgId, jc, updated);
     }
 
     return { id: updated.id, status: updated.status as JobCardStatus };
+  }
+
+  /**
+   * Decide what to do after a job card completes:
+   *  - If parallelGroupId is set and siblings still pending, do nothing yet.
+   *  - Otherwise notify the next sequential stage's manager.
+   *  - When all stages on the order are done, transition order to QUALITY_CHECK.
+   */
+  private async advanceWorkflow(
+    orgId: string,
+    completed: { id: string; orderId: string; departmentId: string; parallelGroupId: string | null; stageSequence: number | null },
+    completedRow: { status: string },
+  ): Promise<void> {
+    void completedRow;
+    // 1) Are there still parallel siblings in flight? If so, stop here.
+    if (completed.parallelGroupId) {
+      const siblingsPending = await this.prisma.client.jobCard.count({
+        where: {
+          orderId: completed.orderId,
+          parallelGroupId: completed.parallelGroupId,
+          id: { not: completed.id },
+          status: { not: 'COMPLETED' },
+        },
+      });
+      if (siblingsPending > 0) {
+        this.gateway.emitToOrg(orgId, 'jobcard:completed', {
+          id: completed.id,
+          orderId: completed.orderId,
+          departmentId: completed.departmentId,
+          waitingFor: siblingsPending,
+        });
+        return;
+      }
+    }
+
+    // 2) Any remaining open job cards on the order at all?
+    const remaining = await this.prisma.client.jobCard.count({
+      where: { orderId: completed.orderId, status: { not: 'COMPLETED' } },
+    });
+    if (remaining === 0) {
+      await this.prisma.client.order.update({
+        where: { id: completed.orderId },
+        data: { status: 'QUALITY_CHECK' },
+      });
+      this.gateway.emitToOrg(orgId, 'order:status_changed', {
+        id: completed.orderId,
+        status: OrderStatus.QUALITY_CHECK,
+      });
+    } else {
+      // 3) Find the NEXT stage (by sequence, falling back to department.sequence
+      //    for legacy orders that didn't come from a workflow).
+      const orderBySequence = completed.stageSequence !== null
+        ? { stageSequence: 'asc' as const }
+        : { department: { sequence: 'asc' as const } };
+      const next = await this.prisma.client.jobCard.findFirst({
+        where: {
+          orderId: completed.orderId,
+          status: 'PENDING',
+          ...(completed.stageSequence !== null
+            ? { stageSequence: { gt: completed.stageSequence } }
+            : {}),
+        },
+        orderBy: orderBySequence,
+        include: { department: true },
+      });
+      if (next?.department.managerId) {
+        await this.notifications.notifyUser({
+          userId: next.department.managerId,
+          orgId,
+          type: 'JOBCARD_COMPLETED',
+          title: `Stage complete on order — next: ${next.department.name}`,
+          body: `Ready to start ${next.department.name}`,
+          metadata: { orderId: completed.orderId, nextJobCardId: next.id },
+        });
+      }
+    }
+
+    this.gateway.emitToOrg(orgId, 'jobcard:completed', {
+      id: completed.id,
+      orderId: completed.orderId,
+      departmentId: completed.departmentId,
+    });
   }
 }

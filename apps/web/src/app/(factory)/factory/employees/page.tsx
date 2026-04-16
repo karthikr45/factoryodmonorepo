@@ -13,6 +13,7 @@ interface Employee {
   name: string;
   phone: string;
   role: string;
+  customRoleId: string | null;
   department: string | null;
   designation: string | null;
   dailyRateOrSalary: number;
@@ -25,6 +26,12 @@ interface Department {
   id: string;
   name: string;
   sequence: number;
+}
+
+interface CustomRole {
+  id: string;
+  name: string;
+  icon: string | null;
 }
 
 export default function EmployeesPage(): JSX.Element {
@@ -51,6 +58,27 @@ export default function EmployeesPage(): JSX.Element {
     queryKey: ['departments'],
     queryFn: () => apiCall<Department[]>({ url: '/production/departments' }),
   });
+
+  const { data: customRoles } = useQuery<CustomRole[]>({
+    queryKey: ['custom-roles'],
+    queryFn: () => apiCall<CustomRole[]>({ url: '/custom-roles' }),
+  });
+
+  const assignRole = (userId: string, customRoleId: string | null): void => {
+    start(async () => {
+      try {
+        await apiCall({
+          url: `/custom-roles/assign/${userId}`,
+          method: 'PUT',
+          data: { customRoleId },
+        });
+        setToast(customRoleId ? 'Role updated' : 'Role removed');
+        qc.invalidateQueries({ queryKey: ['employees'] });
+      } catch (err) {
+        setToast(err instanceof Error ? err.message : 'Failed');
+      }
+    });
+  };
 
   const filtered = employees?.filter((e) =>
     filter === 'all' ? true : e.type === filter,
@@ -162,13 +190,14 @@ export default function EmployeesPage(): JSX.Element {
                 <th className="px-4 py-3 font-medium">Designation / Skill</th>
                 <th className="px-4 py-3 font-medium">Department</th>
                 <th className="px-4 py-3 font-medium">Phone</th>
+                <th className="px-4 py-3 font-medium">Permission role</th>
                 <th className="px-4 py-3 font-medium text-right">Pay</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {(filtered ?? []).length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-neutral-500">
+                  <td colSpan={7} className="px-4 py-12 text-center text-neutral-500">
                     {filter === 'contract'
                       ? 'No contract workers deployed. Ask your staffing agency to deploy workers.'
                       : 'No employees yet. Add your first direct employee above.'}
@@ -189,6 +218,25 @@ export default function EmployeesPage(): JSX.Element {
                   <td className="px-4 py-3">{e.designation ?? e.role}</td>
                   <td className="px-4 py-3 text-neutral-600">{e.department ?? '—'}</td>
                   <td className="px-4 py-3 text-neutral-600">{e.phone}</td>
+                  <td className="px-4 py-3">
+                    {e.type === 'direct' ? (
+                      <select
+                        value={e.customRoleId ?? ''}
+                        onChange={(ev) => assignRole(e.id, ev.target.value || null)}
+                        disabled={pending}
+                        className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                      >
+                        <option value="">Default ({e.role})</option>
+                        {(customRoles ?? []).map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.icon ? `${r.icon} ` : ''}{r.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-xs text-neutral-400">n/a</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     {formatINR(e.dailyRateOrSalary)}
                     <span className="text-xs text-neutral-500">/{e.salaryType === 'monthly' ? 'mo' : 'day'}</span>

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
 
 import { OrderStatus } from '@repo/types';
 import type {
@@ -12,6 +12,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
+import { WhatsAppService } from '../whatsapp/whatsapp.service';
 
 export interface OrderListItem {
   id: string;
@@ -45,7 +46,9 @@ export class OrdersService {
     private readonly accounting: AccountingService,
     private readonly notifications: NotificationsService,
     private readonly gateway: NotificationsGateway,
+    @Inject(forwardRef(() => ApprovalsService))
     private readonly approvals: ApprovalsService,
+    private readonly whatsapp: WhatsAppService,
   ) {}
 
   async list(
@@ -525,42 +528,45 @@ export class OrdersService {
       // Prefer the workflow snapshot stored on the order. Falls back to the
       // org's active Department rows if no workflow was selected.
       const snapshot = existing.workflowSnapshot as
-        | { stages?: Array<{ id: string; name: string; sequence: number }> }
+        | {
+            stages?: Array<{
+              id: string;
+              name: string;
+              sequence: number;
+              parallelGroupId?: string | null;
+              slaHours?: number | null;
+              qcRequired?: boolean | null;
+              qcChecklist?: unknown;
+            }>;
+          }
         | null;
       const stages = snapshot?.stages ?? [];
 
       if (stages.length > 0) {
-        // Map each workflow stage to a department (create/update by name).
-        // JobCard requires a departmentId, so we upsert a department per
-        // stage to keep the existing schema happy.
+        // Map each workflow stage to a department (find/create by name).
+        // The job card carries the stage metadata directly so it survives
+        // any later edits to the workflow template.
         for (const s of stages) {
-          const dept = await this.prisma.client.department.upsert({
-            where: { id: `${id}:${s.id}` }, // synthetic stable id
-            update: {},
-            create: {
-              id: `${id}:${s.id}`,
-              orgId,
-              name: s.name,
-              sequence: s.sequence,
-              isActive: true,
-            },
-          }).catch(async () => {
-            // If synthetic id collides or isn't accepted, fall back to
-            // findFirst + create by name+orgId.
-            const found = await this.prisma.client.department.findFirst({
-              where: { orgId, name: s.name },
-            });
-            if (found) return found;
-            return this.prisma.client.department.create({
+          let dept = await this.prisma.client.department.findFirst({
+            where: { orgId, name: s.name },
+          });
+          if (!dept) {
+            dept = await this.prisma.client.department.create({
               data: { orgId, name: s.name, sequence: s.sequence, isActive: true },
             });
-          });
+          }
           await this.prisma.client.jobCard.create({
             data: {
               orderId: id,
               departmentId: dept.id,
               orgId,
               status: 'PENDING' as const,
+              workflowStageId: s.id,
+              stageSequence: s.sequence,
+              parallelGroupId: s.parallelGroupId ?? null,
+              qcRequired: s.qcRequired ?? false,
+              qcChecklist: (s.qcChecklist as never) ?? undefined,
+              slaHours: s.slaHours ?? null,
             },
           });
         }
@@ -642,6 +648,20 @@ export class OrdersService {
       body: input.note ?? 'Order status updated',
       metadata: { orderId: id, newStatus: input.status },
     });
+
+    // WhatsApp the customer on key milestones (best-effort, never blocks).
+    if (input.status === OrderStatus.CONFIRMED || input.status === OrderStatus.DISPATCHED) {
+      const customer = await this.prisma.client.customer.findUnique({
+        where: { id: existing.customerId },
+        select: { phone: true },
+      });
+      if (customer?.phone) {
+        const send = input.status === OrderStatus.DISPATCHED
+          ? this.whatsapp.sendDispatchNotification(orgId, customer.phone, existing.orderNumber)
+          : this.whatsapp.sendOrderConfirmation(orgId, customer.phone, existing.orderNumber);
+        await send.catch(() => undefined);
+      }
+    }
 
     return { id: updated.id, status: updated.status as OrderStatus };
   }

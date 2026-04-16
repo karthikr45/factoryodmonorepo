@@ -1,7 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, forwardRef, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+
+import { OrderStatus } from '@repo/types';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { OrdersService } from '../orders/orders.service';
 
 interface CreateRuleInput {
   name: string;
@@ -44,6 +47,8 @@ export class ApprovalsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    @Inject(forwardRef(() => OrdersService))
+    private readonly orders: OrdersService,
   ) {}
 
   /**
@@ -227,7 +232,7 @@ export class ApprovalsService {
     }));
   }
 
-  async act(orgId: string, id: string, userId: string, action: 'APPROVE' | 'REJECT', notes?: string): Promise<{ status: string }> {
+  async act(orgId: string, id: string, userId: string, action: 'APPROVE' | 'REJECT', notes?: string): Promise<{ status: string; resumed?: boolean; resumeError?: string }> {
     const req = await this.prisma.client.approvalRequest.findFirst({ where: { id, orgId } });
     if (!req) throw new NotFoundException('Approval request not found');
     if (req.status !== 'PENDING') throw new BadRequestException('Already resolved');
@@ -244,6 +249,40 @@ export class ApprovalsService {
       },
     });
 
-    return { status: action === 'APPROVE' ? 'APPROVED' : 'REJECTED' };
+    // Notify the original requester that their request was resolved.
+    await this.notifications.notifyUser({
+      userId: req.requestedBy,
+      orgId,
+      type: 'GENERIC',
+      title: action === 'APPROVE' ? 'Your request was approved' : 'Your request was rejected',
+      body: `${req.subjectType} ${req.subjectId}: ${action.toLowerCase()}${notes ? ` — ${notes}` : ''}`,
+      metadata: { approvalRequestId: req.id, subjectType: req.subjectType, subjectId: req.subjectId },
+    }).catch((e: unknown) => this.logger.warn(`notifyUser (requester) failed: ${String(e)}`));
+
+    if (action !== 'APPROVE') {
+      return { status: 'REJECTED' };
+    }
+
+    // Auto-resume the original action so the requester doesn't have to re-click.
+    // We invoke the same service method the original blocked call would have hit.
+    let resumed = false;
+    let resumeError: string | undefined;
+    try {
+      if (req.subjectType === 'ORDER' && req.triggerType === 'ORDER_DISPATCH') {
+        await this.orders.changeStatus(orgId, req.requestedBy, req.subjectId, {
+          status: OrderStatus.DISPATCHED,
+          note: `Auto-dispatched after approval ${id}`,
+        });
+        resumed = true;
+      }
+      // Other trigger types (PURCHASE_ORDER, PAYMENT_OUT, etc.) currently allow
+      // the action to complete on first attempt — only an audit trail is added.
+      // Wire additional resume handlers here as those flows start blocking too.
+    } catch (e) {
+      resumeError = e instanceof Error ? e.message : String(e);
+      this.logger.warn(`Auto-resume failed for ${req.subjectType}/${req.subjectId}: ${resumeError}`);
+    }
+
+    return { status: 'APPROVED', resumed, ...(resumeError ? { resumeError } : {}) };
   }
 }
