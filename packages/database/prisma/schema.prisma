@@ -1574,14 +1574,12 @@ model ContactSubmission {
   @@map("contact_submissions")
 }
 
-/**
- * Generic content block — used for misc strings that admin wants to manage
- * without a code change. Examples:
- *  - hero.headline
- *  - pricing.starter.features (JSON)
- *  - announcement.banner
- *  - landing.demo_scenes (JSON array)
- */
+/// Generic content block — used for misc strings that admin wants to manage
+/// without a code change. Examples:
+///  - hero.headline
+///  - pricing.starter.features (JSON)
+///  - announcement.banner
+///  - landing.demo_scenes (JSON array)
 model ContentBlock {
   id        String   @id @default(uuid())
   key       String   @unique
