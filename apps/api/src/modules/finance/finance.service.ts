@@ -201,6 +201,135 @@ export class FinanceService {
     });
   }
 
+  /**
+   * Aged receivables — open invoices by age bucket. Bucket is computed
+   * against `dueDate` if present, otherwise `invoiceDate + 30d`.
+   */
+  async agedReceivables(orgId: string): Promise<{
+    asOf: Date;
+    buckets: { label: string; amount: number; count: number }[];
+    rows: Array<{
+      invoiceId: string;
+      invoiceNumber: string;
+      customerName: string;
+      invoiceDate: Date;
+      dueDate: Date | null;
+      daysOverdue: number;
+      bucket: string;
+      outstandingPaise: number;
+    }>;
+    totalOutstanding: number;
+  }> {
+    const asOf = new Date();
+    const open = await this.prisma.client.invoice.findMany({
+      where: { orgId, status: { notIn: ['PAID', 'CANCELLED'] } },
+      include: { customer: { select: { name: true } } },
+      orderBy: { invoiceDate: 'asc' },
+    });
+
+    const bucketise = (days: number): string => {
+      if (days <= 0) return 'Current';
+      if (days <= 30) return '1-30 days';
+      if (days <= 60) return '31-60 days';
+      if (days <= 90) return '61-90 days';
+      return '90+ days';
+    };
+
+    const buckets = new Map<string, { amount: number; count: number }>();
+    for (const k of ['Current', '1-30 days', '31-60 days', '61-90 days', '90+ days']) {
+      buckets.set(k, { amount: 0, count: 0 });
+    }
+
+    const rows = open.map((inv) => {
+      const due = inv.dueDate ?? new Date(inv.invoiceDate.getTime() + 30 * 86_400_000);
+      const daysOverdue = Math.floor((asOf.getTime() - due.getTime()) / 86_400_000);
+      const outstanding = Number(inv.totalAmount) - Number(inv.paidAmount);
+      const bucket = bucketise(daysOverdue);
+      const b = buckets.get(bucket)!;
+      b.amount += outstanding; b.count += 1;
+      return {
+        invoiceId: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        customerName: inv.customer.name,
+        invoiceDate: inv.invoiceDate,
+        dueDate: inv.dueDate,
+        daysOverdue,
+        bucket,
+        outstandingPaise: outstanding,
+      };
+    });
+
+    return {
+      asOf,
+      buckets: Array.from(buckets.entries()).map(([label, v]) => ({ label, amount: v.amount, count: v.count })),
+      rows,
+      totalOutstanding: rows.reduce((a, r) => a + r.outstandingPaise, 0),
+    };
+  }
+
+  /**
+   * Aged payables — open POs by how long ago they were received. Approximated
+   * by total PO amount because we don't track PO-level payments yet.
+   */
+  async agedPayables(orgId: string): Promise<{
+    asOf: Date;
+    buckets: { label: string; amount: number; count: number }[];
+    rows: Array<{
+      poId: string;
+      poNumber: string;
+      vendorName: string;
+      receivedDate: Date | null;
+      daysOpen: number;
+      bucket: string;
+      amountPaise: number;
+    }>;
+    totalOutstanding: number;
+  }> {
+    const asOf = new Date();
+    const pos = await this.prisma.client.purchaseOrder.findMany({
+      where: { orgId, status: { in: ['RECEIVED', 'PARTIALLY_RECEIVED'] as never } },
+      include: { vendor: { select: { name: true } } },
+      orderBy: { receivedDate: 'asc' },
+    });
+
+    const bucketise = (days: number): string => {
+      if (days <= 30) return '0-30 days';
+      if (days <= 60) return '31-60 days';
+      if (days <= 90) return '61-90 days';
+      return '90+ days';
+    };
+
+    const buckets = new Map<string, { amount: number; count: number }>();
+    for (const k of ['0-30 days', '31-60 days', '61-90 days', '90+ days']) {
+      buckets.set(k, { amount: 0, count: 0 });
+    }
+
+    const rows = pos.map((po) => {
+      const ref = po.receivedDate ?? po.expectedDate ?? new Date();
+      const daysOpen = Math.max(0, Math.floor((asOf.getTime() - ref.getTime()) / 86_400_000));
+      const amount = Number(po.totalAmount);
+      const bucket = bucketise(daysOpen);
+      const b = buckets.get(bucket)!;
+      b.amount += amount; b.count += 1;
+      return {
+        poId: po.id,
+        poNumber: po.poNumber,
+        vendorName: po.vendor.name,
+        receivedDate: po.receivedDate,
+        daysOpen,
+        bucket,
+        amountPaise: amount,
+      };
+    });
+
+    return {
+      asOf,
+      buckets: Array.from(buckets.entries()).map(([label, v]) => ({ label, amount: v.amount, count: v.count })),
+      rows,
+      totalOutstanding: rows.reduce((a, r) => a + r.amountPaise, 0),
+    };
+  }
+
   async profitAndLoss(orgId: string, from: Date, to: Date): Promise<ProfitAndLoss> {
     const rows = await this.trialBalance(orgId, to);
     // Only counts entries in the [from, to] range — re-pull for precision.

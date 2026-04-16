@@ -138,6 +138,16 @@ async function main(): Promise<void> {
     },
   });
 
+  // Factory accountant
+  const accountant = await prisma.user.upsert({
+    where: { phone: '+919876543225' },
+    update: {},
+    create: {
+      orgId: factory.id, name: 'Geetha Iyer', phone: '+919876543225',
+      email: 'geetha@hpcfactory.in', role: 'ACCOUNTANT',
+    },
+  });
+
   // Agency admin
   const agencyAdmin = await prisma.user.upsert({
     where: { phone: '+919876543211' },
@@ -145,6 +155,16 @@ async function main(): Promise<void> {
     create: {
       orgId: agency.id, name: 'Suresh Naidu', phone: '+919876543211',
       role: 'AGENCY_ADMIN',
+    },
+  });
+
+  // Agency supervisor
+  await prisma.user.upsert({
+    where: { phone: '+919876543226' },
+    update: {},
+    create: {
+      orgId: agency.id, name: 'Mahesh Yadav', phone: '+919876543226',
+      role: 'AGENCY_SUPERVISOR',
     },
   });
 
@@ -203,6 +223,7 @@ async function main(): Promise<void> {
     { userId: storeKeeper.id, deptIdx: null, designation: 'Store Keeper', salary: 2000000 },
     { userId: machineOp1.id, deptIdx: 1, designation: 'CNC Operator', salary: 2500000 },
     { userId: machineOp2.id, deptIdx: 0, designation: 'Cutting Operator', salary: 2200000 },
+    { userId: accountant.id, deptIdx: null, designation: 'Accountant', salary: 3000000 },
   ];
   for (const p of profiles) {
     const exists = await prisma.employeeProfile.findUnique({ where: { userId: p.userId } });

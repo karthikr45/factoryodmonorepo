@@ -29,6 +29,6 @@ import { TwilioService } from './twilio.service';
     // Endpoints opt out with @Public().
     { provide: APP_GUARD, useClass: JwtGuard },
   ],
-  exports: [AuthService, JwtStrategy],
+  exports: [AuthService, JwtStrategy, TwilioService],
 })
 export class AuthModule {}

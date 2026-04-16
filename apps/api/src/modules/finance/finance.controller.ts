@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Post,
   Query,
   UsePipes,
@@ -21,6 +22,7 @@ import {
 } from '../../common/decorators/current-user.decorator';
 import { OrgId } from '../../common/decorators/org-id.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { RelationshipsService } from '../relationships/relationships.service';
 
 import { FinanceService } from './finance.service';
 
@@ -28,7 +30,10 @@ import { FinanceService } from './finance.service';
 @ApiTags('finance')
 @Controller('finance')
 export class FinanceController {
-  constructor(private readonly financeService: FinanceService) {}
+  constructor(
+    private readonly financeService: FinanceService,
+    private readonly relationships: RelationshipsService,
+  ) {}
 
   // ---- Ledgers ----
   @Get('ledgers')
@@ -101,5 +106,39 @@ export class FinanceController {
     @Query('to') to: string,
   ): ReturnType<FinanceService['profitAndLoss']> {
     return this.financeService.profitAndLoss(orgId, new Date(from), new Date(to));
+  }
+
+  @Get('aged-receivables')
+  async agedReceivables(@OrgId() orgId: string): ReturnType<FinanceService['agedReceivables']> {
+    return this.financeService.agedReceivables(orgId);
+  }
+
+  @Get('aged-payables')
+  async agedPayables(@OrgId() orgId: string): ReturnType<FinanceService['agedPayables']> {
+    return this.financeService.agedPayables(orgId);
+  }
+
+  // ---- CA cross-client reads ----
+  // The path includes the client orgId; we verify the caller is a CA with
+  // an active FACTORY_CA relationship to that org before delegating.
+
+  @Get('client/:clientOrgId/trial-balance')
+  async clientTrialBalance(
+    @OrgId() caOrgId: string,
+    @Param('clientOrgId') clientOrgId: string,
+  ): ReturnType<FinanceService['trialBalance']> {
+    await this.relationships.assertCaCanRead(caOrgId, clientOrgId);
+    return this.financeService.trialBalance(clientOrgId);
+  }
+
+  @Get('client/:clientOrgId/profit-and-loss')
+  async clientPnl(
+    @OrgId() caOrgId: string,
+    @Param('clientOrgId') clientOrgId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ): ReturnType<FinanceService['profitAndLoss']> {
+    await this.relationships.assertCaCanRead(caOrgId, clientOrgId);
+    return this.financeService.profitAndLoss(clientOrgId, new Date(from), new Date(to));
   }
 }

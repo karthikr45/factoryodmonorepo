@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator';
@@ -69,6 +69,16 @@ export class CheckInController {
       Number(month ?? now.getMonth() + 1),
       Number(year ?? now.getFullYear()),
     );
+  }
+
+  @Post('me/:id/dispute')
+  @ApiOperation({ summary: 'Worker flags an issue with their own check-in record' })
+  async raiseDispute(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() body: { note: string },
+  ): ReturnType<CheckInService['raiseDispute']> {
+    return this.checkInService.raiseDispute(user.id, id, body?.note ?? '');
   }
 
   @Get()

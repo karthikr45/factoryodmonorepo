@@ -3,12 +3,16 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   Patch,
   Post,
+  Query,
+  Res,
   UsePipes,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 
 import {
   inviteMemberSchema,
@@ -120,5 +124,32 @@ export class OrganisationsController {
     @Param('id') id: string,
   ): ReturnType<EmployeesService['getProfile']> {
     return this.employeesService.getProfile(orgId, id);
+  }
+
+  @Get('employees/me/profile')
+  @ApiOperation({ summary: 'My own employee profile (direct employees only)' })
+  async myProfile(
+    @OrgId() orgId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): ReturnType<EmployeesService['getProfile']> {
+    return this.employeesService.getProfile(orgId, user.id);
+  }
+
+  @Get('employees/me/payslip.pdf')
+  @Header('Content-Type', 'application/pdf')
+  @ApiOperation({ summary: 'On-the-fly salary slip for the current direct employee' })
+  async myPayslip(
+    @OrgId() orgId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('month') month: string,
+    @Query('year') year: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const m = Number(month);
+    const y = Number(year);
+    const { buffer, filename } = await this.employeesService.getMyPayslipPdf(orgId, user.id, m, y);
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Content-Length', String(buffer.length));
+    res.end(buffer);
   }
 }

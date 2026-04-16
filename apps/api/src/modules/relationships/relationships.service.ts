@@ -75,6 +75,96 @@ export class RelationshipsService {
   }
 
   /**
+   * For a CA firm: list every factory client with a one-line health snapshot.
+   * Cheap aggregation — counts only, no balance-sheet maths — so this scales
+   * to a CA with 50+ small-business clients.
+   */
+  async caClients(caOrgId: string): Promise<Array<{
+    orgId: string;
+    orgName: string;
+    gstin: string | null;
+    sinceDate: Date | null;
+    openInvoices: number;
+    overdueInvoices: number;
+    pendingGstReturns: number;
+    last30dRevenue: number; // rupees
+  }>> {
+    // Two relationship directions to consider: CA invited the factory (from=CA)
+    // OR factory invited the CA (from=Factory). Either way the CA reads the
+    // factory's books.
+    const [fromCa, toCa] = await Promise.all([
+      this.prisma.client.orgRelationship.findMany({
+        where: { fromOrgId: caOrgId, type: 'FACTORY_CA', status: 'ACTIVE' },
+        include: { toOrg: { select: { id: true, name: true, gstin: true } } },
+      }),
+      this.prisma.client.orgRelationship.findMany({
+        where: { toOrgId: caOrgId, type: 'FACTORY_CA', status: 'ACTIVE' },
+        include: { fromOrg: { select: { id: true, name: true, gstin: true } } },
+      }),
+    ]);
+
+    const clients = [
+      ...fromCa.map((r) => ({ orgId: r.toOrg.id, orgName: r.toOrg.name, gstin: r.toOrg.gstin, sinceDate: r.acceptedAt })),
+      ...toCa.map((r) => ({ orgId: r.fromOrg.id, orgName: r.fromOrg.name, gstin: r.fromOrg.gstin, sinceDate: r.acceptedAt })),
+    ];
+    // Dedup if both directions exist for the same pair.
+    const dedup = new Map<string, typeof clients[number]>();
+    for (const c of clients) dedup.set(c.orgId, c);
+
+    const since30d = new Date(Date.now() - 30 * 86_400_000);
+    const out: Array<{
+      orgId: string; orgName: string; gstin: string | null; sinceDate: Date | null;
+      openInvoices: number; overdueInvoices: number; pendingGstReturns: number; last30dRevenue: number;
+    }> = [];
+    for (const c of dedup.values()) {
+      const [openInvoices, overdueInvoices, pendingGstReturns, revenueAgg] = await Promise.all([
+        this.prisma.client.invoice.count({
+          where: { orgId: c.orgId, status: { notIn: ['PAID', 'CANCELLED'] } },
+        }),
+        this.prisma.client.invoice.count({
+          where: { orgId: c.orgId, status: { notIn: ['PAID', 'CANCELLED'] }, dueDate: { lt: new Date() } },
+        }),
+        this.prisma.client.gSTReturn.count({
+          where: { orgId: c.orgId, status: 'DRAFT' },
+        }),
+        this.prisma.client.invoice.aggregate({
+          where: { orgId: c.orgId, status: 'PAID', invoiceDate: { gte: since30d } },
+          _sum: { totalAmount: true },
+        }),
+      ]);
+      out.push({
+        ...c,
+        openInvoices,
+        overdueInvoices,
+        pendingGstReturns,
+        last30dRevenue: Number(revenueAgg._sum.totalAmount ?? 0n) / 100,
+      });
+    }
+    return out.sort((a, b) => b.overdueInvoices - a.overdueInvoices || b.openInvoices - a.openInvoices);
+  }
+
+  /**
+   * Verify the CA org has an active FACTORY_CA relationship with the given
+   * factory orgId. Used as an authorization helper before a CA reads a
+   * client's data.
+   */
+  async assertCaCanRead(caOrgId: string, factoryOrgId: string): Promise<void> {
+    const link = await this.prisma.client.orgRelationship.findFirst({
+      where: {
+        type: 'FACTORY_CA',
+        status: 'ACTIVE',
+        OR: [
+          { fromOrgId: caOrgId, toOrgId: factoryOrgId },
+          { fromOrgId: factoryOrgId, toOrgId: caOrgId },
+        ],
+      },
+    });
+    if (!link) {
+      throw new NotFoundException('No active CA relationship with this factory');
+    }
+  }
+
+  /**
    * Search for organisations to connect with (by GSTIN, phone, or name).
    */
   async searchOrganisations(query: string, excludeOrgId: string): Promise<Array<{

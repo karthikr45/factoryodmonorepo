@@ -35,4 +35,9 @@ export class RelationshipsController {
   async search(@OrgId() orgId: string, @Query('q') q: string): ReturnType<RelationshipsService['searchOrganisations']> {
     return this.relationshipsService.searchOrganisations(q, orgId);
   }
+
+  @Get('ca/clients')
+  async caClients(@OrgId() orgId: string): ReturnType<RelationshipsService['caClients']> {
+    return this.relationshipsService.caClients(orgId);
+  }
 }

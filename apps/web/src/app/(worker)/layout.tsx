@@ -4,6 +4,8 @@ const nav = [
   { href: '/worker', label: 'Home' },
   { href: '/worker/tasks', label: 'My tasks' },
   { href: '/worker/attendance', label: 'My attendance' },
+  { href: '/worker/pay', label: 'My pay' },
+  { href: '/worker/chat', label: 'Chat' },
 ];
 
 export default function WorkerLayout({

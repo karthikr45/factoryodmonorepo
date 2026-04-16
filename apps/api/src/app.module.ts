@@ -19,7 +19,10 @@ import { ChatModule } from './modules/chat/chat.module';
 import { CheckInModule } from './modules/check-in/check-in.module';
 import { ComplianceModule } from './modules/compliance/compliance.module';
 import { ContentModule } from './modules/content/content.module';
+import { ContractWorkerPortalModule } from './modules/contract-worker-portal/contract-worker-portal.module';
+import { CustomerPortalModule } from './modules/customer-portal/customer-portal.module';
 import { CustomRolesModule } from './modules/custom-roles/custom-roles.module';
+import { ExpensesModule } from './modules/expenses/expenses.module';
 import { FilesModule } from './modules/files/files.module';
 import { ImportsModule } from './modules/imports/imports.module';
 import { FinanceModule } from './modules/finance/finance.module';
@@ -108,9 +111,12 @@ import { HealthController } from './health.controller';
     WaitlistModule,
     AIAssistantModule,
     ContentModule,
+    CustomerPortalModule,
+    ContractWorkerPortalModule,
 
     // Finance, Compliance, Reports, Notifications
     FinanceModule,
+    ExpensesModule,
     NotificationsModule,
     ComplianceModule,
     ReportsModule,

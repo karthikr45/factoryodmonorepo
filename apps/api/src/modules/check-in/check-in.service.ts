@@ -1,6 +1,7 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 interface CheckInInput {
   workerId: string;
@@ -19,7 +20,43 @@ interface CheckOutInput {
 export class CheckInService {
   private readonly SHIFT_START_HOUR = 9; // 9 AM IST
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
+
+  /**
+   * A direct worker flags a discrepancy on one of their own check-in records.
+   * Stores the note on CheckInOut.notes (prefixed) and pings the org's
+   * managers/owners so someone can resolve it.
+   */
+  async raiseDispute(userId: string, checkInId: string, note: string): Promise<{ ok: true }> {
+    if (!note || note.trim().length < 5) {
+      throw new BadRequestException('Please describe the issue in at least 5 characters');
+    }
+    const rec = await this.prisma.client.checkInOut.findFirst({
+      where: { id: checkInId, userId },
+    });
+    if (!rec) throw new NotFoundException('Check-in record not found');
+
+    const prefix = '[DISPUTE]';
+    const stamped = `${prefix} ${new Date().toISOString().slice(0, 10)} — ${note.trim()}`;
+    const merged = rec.notes ? `${rec.notes}\n${stamped}` : stamped;
+
+    await this.prisma.client.checkInOut.update({
+      where: { id: rec.id },
+      data: { notes: merged },
+    });
+
+    await this.notifications.notifyOrg({
+      orgId: rec.factoryOrgId,
+      type: 'ATTENDANCE_DISPUTED',
+      title: 'Worker flagged an attendance issue',
+      body: note.trim(),
+      metadata: { checkInId: rec.id, date: rec.date.toISOString() },
+    });
+    return { ok: true };
+  }
 
   async checkIn(factoryOrgId: string, input: CheckInInput): Promise<{
     id: string;
@@ -256,7 +293,7 @@ export class CheckInService {
   }
 
   async myHistory(userId: string, month: number, year: number): Promise<{
-    records: Array<{ date: Date; checkInTime: Date | null; checkOutTime: Date | null; totalHours: number | null; isLate: boolean; }>;
+    records: Array<{ id: string; date: Date; checkInTime: Date | null; checkOutTime: Date | null; totalHours: number | null; isLate: boolean; hasDispute: boolean; }>;
     summary: { daysPresent: number; totalHours: number; lateCount: number; };
   }> {
     const from = new Date(Date.UTC(year, month - 1, 1));
@@ -267,8 +304,9 @@ export class CheckInService {
     });
     return {
       records: rows.map((r) => ({
-        date: r.date, checkInTime: r.checkInTime, checkOutTime: r.checkOutTime,
+        id: r.id, date: r.date, checkInTime: r.checkInTime, checkOutTime: r.checkOutTime,
         totalHours: r.totalHours, isLate: r.isLate,
+        hasDispute: !!r.notes && r.notes.includes('[DISPUTE]'),
       })),
       summary: {
         daysPresent: rows.length,

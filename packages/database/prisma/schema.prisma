@@ -83,6 +83,28 @@ model SubscriptionPayment {
   @@map("subscription_payments")
 }
 
+model Expense {
+  id            String   @id @default(uuid())
+  orgId         String
+  date          DateTime @db.Date
+  category      String   // RENT / UTILITIES / TRAVEL / OFFICE / OTHER
+  description   String
+  amountPaise   BigInt
+  paymentMethod String   @default("BANK_TRANSFER") // CASH / BANK_TRANSFER / UPI / CHEQUE / CARD
+  vendorName    String?
+  attachmentUrl String?
+  ledgerCode    String   // posts to this expense ledger (e.g. 5400 Rent)
+  notes         String?
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, date])
+  @@index([orgId, category])
+  @@map("expenses")
+}
+
 enum UserRole {
   SUPER_ADMIN
   OWNER
@@ -242,6 +264,7 @@ model Organisation {
   approvalRequests  ApprovalRequest[]
   aiInteractions    AIInteraction[]
   subscription      Subscription?
+  expenses          Expense[]
 
   @@index([type])
   @@index([isActive])
