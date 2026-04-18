@@ -7,6 +7,7 @@ export interface AuthenticatedUser {
   orgId: string;
   role: UserRole;
   phone: string;
+  name: string;
 }
 
 /**

@@ -22,8 +22,8 @@ async function bootstrap(): Promise<void> {
   // body parser still applies; we just stash the buffer on req.rawBody.
   app.use(
     json({
-      verify: (req: { rawBody?: Buffer }, _res, buf) => {
-        req.rawBody = Buffer.from(buf);
+      verify: (req: unknown, _res: unknown, buf: Buffer) => {
+        (req as Record<string, unknown>).rawBody = Buffer.from(buf);
       },
     }),
   );

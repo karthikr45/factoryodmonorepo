@@ -53,7 +53,7 @@ export class AuthController {
   async verifyOtp(
     @Body() body: VerifyOtpInput,
   ): ReturnType<AuthService['verifyOtp']> {
-    return this.authService.verifyOtp(body.phone, body.code, body.inviteToken);
+    return this.authService.verifyOtp(body.phone, body.code, (body as Record<string, unknown>).inviteToken as string | undefined);
   }
 
   @Public()
@@ -89,13 +89,14 @@ export class AuthController {
   async debugToken(@Query('token') token: string): Promise<unknown> {
     if (!token) return { error: 'pass ?token=eyJ...' };
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const jwt = require('jsonwebtoken') as typeof import('jsonwebtoken');
+    const { JwtService } = await import('@nestjs/jwt');
+    const jwtSvc = new JwtService({ secret: process.env.JWT_SECRET ?? 'dev-secret-change-me' });
     const secret = process.env.JWT_SECRET ?? 'dev-secret-change-me';
     try {
-      const decoded = jwt.verify(token, secret);
+      const decoded = await jwtSvc.verifyAsync(token);
       return { status: 'VALID', secretPreview: `${secret.slice(0, 4)}...${secret.slice(-4)}`, decoded };
     } catch (err) {
-      const raw = jwt.decode(token);
+      const raw = jwtSvc.decode(token);
       return {
         status: 'INVALID',
         reason: err instanceof Error ? err.message : String(err),

@@ -22,7 +22,7 @@ export class QuotationsService {
     });
     if (!q) throw new NotFoundException('Quotation not found');
 
-    const items = (q.items as Array<QuotationItem>).map((it) => ({
+    const items = (q.items as unknown as Array<QuotationItem>).map((it) => ({
       description: it.description,
       quantity: it.quantity,
       unit: it.unit,

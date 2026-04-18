@@ -24,7 +24,7 @@ export class InvoicesService {
     });
     if (!inv) throw new NotFoundException('Invoice not found');
 
-    const items = (inv.items as Array<InvoiceItem>).map((it) => ({
+    const items = (inv.items as unknown as Array<InvoiceItem>).map((it) => ({
       description: it.description,
       quantity: it.quantity,
       unit: it.unit,

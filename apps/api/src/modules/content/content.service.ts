@@ -150,17 +150,13 @@ export class ContentService {
       }),
       this.prisma.client.worker.count({ where: { isActive: true } }),
       this.prisma.client.organisation.findMany({
-        where: { isActive: true, address: { not: null } },
-        select: { address: true },
+        where: { isActive: true },
+        select: { name: true },
       }),
     ]);
 
     const gmvCr = Number(totalGmv._sum.totalValue ?? 0n) / 100 / 1_00_00_000;
-    const uniqueStates = new Set(
-      states
-        .map((o) => (o.address ?? '').split(',').pop()?.trim())
-        .filter(Boolean),
-    ).size;
+    const uniqueStates = states.length;
 
     // Show pretty floors. If real numbers are tiny (early days), show "0+"
     return [

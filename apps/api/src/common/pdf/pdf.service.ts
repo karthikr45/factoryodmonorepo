@@ -164,14 +164,14 @@ export class PdfService {
         ['Overtime', input.earnings.overtimePaise ?? 0],
         ['Bonus', input.earnings.bonusPaise ?? 0],
         ['Other', input.earnings.otherPaise ?? 0],
-      ].filter(([, v]) => v > 0) as Array<[string, number]>;
+      ].filter(([, v]) => Number(v) > 0) as Array<[string, number]>;
       const deductions: Array<[string, number]> = [
         ['PF', input.deductions.pfPaise ?? 0],
         ['ESI', input.deductions.esiPaise ?? 0],
         ['TDS', input.deductions.taxPaise ?? 0],
         ['Advance', input.deductions.advancePaise ?? 0],
         ['Other', input.deductions.otherPaise ?? 0],
-      ].filter(([, v]) => v > 0) as Array<[string, number]>;
+      ].filter(([, v]) => Number(v) > 0) as Array<[string, number]>;
 
       const earnTotal = earnings.reduce((s, [, v]) => s + v, 0);
       const dedTotal = deductions.reduce((s, [, v]) => s + v, 0);
