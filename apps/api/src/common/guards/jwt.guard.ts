@@ -22,9 +22,21 @@ export class JwtGuard extends AuthGuard('jwt') {
     return super.canActivate(context) as boolean | Promise<boolean>;
   }
 
-  override handleRequest<TUser = unknown>(err: Error | null, user: TUser): TUser {
+  override handleRequest<TUser = unknown>(
+    err: Error | null,
+    user: TUser,
+    info?: { name?: string; message?: string } | Error,
+  ): TUser {
     if (err || !user) {
-      throw err ?? new UnauthorizedException('Authentication required');
+      // Surface passport's real reason ("jwt expired", "invalid signature",
+      // "No auth token") — much easier to diagnose than a generic "required".
+      const reason =
+        (info && 'message' in info && typeof info.message === 'string'
+          ? info.message
+          : undefined) ??
+        (info instanceof Error ? info.message : undefined) ??
+        'Authentication required';
+      throw err ?? new UnauthorizedException(reason);
     }
     return user;
   }
