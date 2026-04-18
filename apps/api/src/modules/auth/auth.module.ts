@@ -17,8 +17,9 @@ import { TwilioService } from './twilio.service';
     JwtModule.register({
       secret: process.env.JWT_SECRET ?? 'dev-secret-change-me',
       signOptions: {
-        expiresIn: process.env.JWT_EXPIRES_IN
-          ?? (process.env.NODE_ENV === 'production' ? '15m' : '8h'),
+        expiresIn: process.env.NODE_ENV === 'production'
+          ? (process.env.JWT_EXPIRES_IN ?? '15m')
+          : '8h',
       },
     }),
     InvitationsModule,
