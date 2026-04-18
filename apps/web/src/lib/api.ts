@@ -8,9 +8,11 @@
  * - Unwraps the ApiResponse<T> envelope automatically.
  */
 import axios, {
+  type AxiosError,
   type AxiosInstance,
   type AxiosRequestConfig,
   type AxiosResponse,
+  type InternalAxiosRequestConfig,
 } from 'axios';
 
 import type { ApiResponse, ErrorResponse } from '@repo/types';
@@ -40,12 +42,54 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/**
+ * Single-flight refresh. A burst of 401s (e.g. parallel react-query fetches)
+ * triggers exactly one refresh call; all waiters resolve to the same new token.
+ */
+let refreshInFlight: Promise<string | null> | null = null;
+async function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    try {
+      const res = await fetch('/auth/refresh-proxy', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) return null;
+      const body = (await res.json()) as { ok: boolean; accessToken?: string };
+      return body.ok && body.accessToken ? body.accessToken : null;
+    } catch {
+      return null;
+    } finally {
+      // Clear after a micro-delay so tests still see the pending promise if
+      // they await immediately after triggering a second 401.
+      setTimeout(() => { refreshInFlight = null; }, 0);
+    }
+  })();
+  return refreshInFlight;
+}
+
 api.interceptors.response.use(
   (response) => response,
-  (error: {
-    response?: AxiosResponse<ErrorResponse>;
-    message: string;
-  }) => {
+  async (error: AxiosError<ErrorResponse>) => {
+    const status = error.response?.status;
+    const original = error.config as (InternalAxiosRequestConfig & { _retried?: boolean }) | undefined;
+
+    // On 401 — try to refresh ONCE, then retry the original request.
+    if (status === 401 && original && !original._retried) {
+      original._retried = true;
+      const fresh = await refreshAccessToken();
+      if (fresh) {
+        original.headers = original.headers ?? {};
+        (original.headers as Record<string, string>).Authorization = `Bearer ${fresh}`;
+        return api.request(original);
+      }
+      // Refresh failed → cookies have been wiped server-side; kick to login.
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+      }
+    }
+
     const message =
       error.response?.data?.error?.message ?? error.message ?? 'Request failed';
     return Promise.reject(new Error(message));

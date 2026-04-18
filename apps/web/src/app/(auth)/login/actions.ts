@@ -118,3 +118,43 @@ export async function logoutAction(): Promise<void> {
   store.delete(USER_COOKIE);
   redirect('/login');
 }
+
+/**
+ * Exchange the (httpOnly) refresh cookie for a fresh access token.
+ * Called from the client-side axios interceptor when a request returns 401;
+ * the client can't read the httpOnly refresh cookie itself, so it delegates
+ * to this server action. Returns the new access token so the axios
+ * interceptor can immediately retry the original request with it.
+ */
+export async function refreshAccessAction(): Promise<{ ok: boolean; accessToken?: string }> {
+  const store = await cookies();
+  const rt = store.get(REFRESH_COOKIE)?.value;
+  if (!rt) return { ok: false };
+
+  let tokens: AuthTokens;
+  try {
+    tokens = await apiCallServer<AuthTokens>('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken: rt }),
+    });
+  } catch {
+    // Refresh failed — wipe cookies so the next navigation hits /login.
+    store.delete(ACCESS_COOKIE);
+    store.delete(REFRESH_COOKIE);
+    store.delete(USER_COOKIE);
+    return { ok: false };
+  }
+
+  const common = {
+    sameSite: 'lax' as const,
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+  };
+  store.set(ACCESS_COOKIE, tokens.accessToken, { ...common, maxAge: tokens.expiresIn });
+  store.set(REFRESH_COOKIE, tokens.refreshToken, {
+    ...common,
+    maxAge: 60 * 60 * 24 * 30,
+    httpOnly: true,
+  });
+  return { ok: true, accessToken: tokens.accessToken };
+}
