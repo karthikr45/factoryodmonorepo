@@ -25,7 +25,10 @@ interface VerifyOtpResult {
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
-  private readonly ACCESS_TTL = process.env.JWT_EXPIRES_IN ?? '15m';
+  // In dev, default to 8 hours so testers don't get logged out mid-flow.
+  // Production deploys must set JWT_EXPIRES_IN (recommended: 15m).
+  private readonly ACCESS_TTL = process.env.JWT_EXPIRES_IN
+    ?? (process.env.NODE_ENV === 'production' ? '15m' : '8h');
   private readonly REFRESH_TTL = process.env.JWT_REFRESH_EXPIRES_IN ?? '30d';
 
   constructor(
