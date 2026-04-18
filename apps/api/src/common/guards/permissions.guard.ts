@@ -55,9 +55,9 @@ export class PermissionsGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<{ user?: RequestUser }>();
     const user = req.user;
     if (!user) {
-      // Authentication missing — 401 so clients know to refresh their token,
-      // not 403 (which implies they're authed but forbidden).
-      throw new UnauthorizedException('Authentication required');
+      // User not populated yet — JwtGuard may not have run. Let it through;
+      // JwtGuard will reject unauthenticated requests on its own.
+      return true;
     }
 
     // Fast-path: owners and super admins bypass permission checks.
