@@ -12,14 +12,23 @@ import { initSentry } from './common/observability/sentry';
 
 async function bootstrap(): Promise<void> {
   await initSentry();
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { cors: false });
 
-  // Security headers
+  // CORS must be enabled at create() time so the framework handles OPTIONS
+  // preflight BEFORE guards run. When CORS was configured via enableCors()
+  // after create({ cors: false }), OPTIONS requests reached JwtGuard and
+  // got rejected with 401 — blocking every browser-initiated POST/PATCH.
+  const corsOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000').split(',');
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    cors: {
+      origin: corsOrigins,
+      credentials: true,
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    },
+  });
+
   app.use(helmet());
 
-  // Capture the raw request body for /api/billing/webhook so we can verify
-  // Razorpay's HMAC signature against the exact bytes they sent. The default
-  // body parser still applies; we just stash the buffer on req.rawBody.
   app.use(
     json({
       verify: (req: unknown, _res: unknown, buf: Buffer) => {
@@ -28,14 +37,6 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // CORS
-  const corsOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000').split(',');
-  app.enableCors({
-    origin: corsOrigins,
-    credentials: true,
-  });
-
-  // Global validation
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -45,14 +46,11 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // Global exception + response wrappers
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new ResponseInterceptor());
 
-  // Global /api prefix
   app.setGlobalPrefix('api', { exclude: ['health'] });
 
-  // Swagger OpenAPI
   const swaggerConfig = new DocumentBuilder()
     .setTitle('FactoryOS API')
     .setDescription('Manufacturing operations + finance backend')
