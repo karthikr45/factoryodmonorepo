@@ -242,10 +242,14 @@ export class AuthService {
   ): Promise<AuthTokens> {
     const payload: JwtPayload = { sub: userId, orgId, role, phone };
 
+    // Access token: do NOT pass `secret` here — let JwtService use the same
+    // secret JwtModule.register() was initialised with. This guarantees the
+    // signing key and the passport-jwt verification key can never diverge.
     const accessToken = await this.jwt.signAsync(payload, {
-      secret: process.env.JWT_SECRET ?? 'dev-secret-change-me',
       expiresIn: this.ACCESS_TTL,
     });
+    // Refresh token uses a separate secret so a leaked refresh can't be used
+    // as an access token.
     const refreshToken = await this.jwt.signAsync(payload, {
       secret: process.env.JWT_REFRESH_SECRET ?? 'dev-refresh-secret',
       expiresIn: this.REFRESH_TTL,

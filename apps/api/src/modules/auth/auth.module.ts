@@ -16,7 +16,10 @@ import { TwilioService } from './twilio.service';
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
       secret: process.env.JWT_SECRET ?? 'dev-secret-change-me',
-      signOptions: { expiresIn: process.env.JWT_EXPIRES_IN ?? '15m' },
+      signOptions: {
+        expiresIn: process.env.JWT_EXPIRES_IN
+          ?? (process.env.NODE_ENV === 'production' ? '15m' : '8h'),
+      },
     }),
     InvitationsModule,
   ],
