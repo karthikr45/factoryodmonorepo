@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Query,
   UsePipes,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -76,8 +77,31 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Log out (stateless — client discards tokens)' })
   logout(): { ok: true } {
-    // Stateless JWT — clients must discard their tokens.
-    // If we later add refresh rotation with DB-backed IDs, revoke here.
     return { ok: true };
+  }
+
+  /**
+   * DEV ONLY — paste your JWT and see exactly why it passes or fails
+   * verification. Remove before deploying to production.
+   */
+  @Public()
+  @Get('debug-token')
+  async debugToken(@Query('token') token: string): Promise<unknown> {
+    if (!token) return { error: 'pass ?token=eyJ...' };
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const jwt = require('jsonwebtoken') as typeof import('jsonwebtoken');
+    const secret = process.env.JWT_SECRET ?? 'dev-secret-change-me';
+    try {
+      const decoded = jwt.verify(token, secret);
+      return { status: 'VALID', secretPreview: `${secret.slice(0, 4)}...${secret.slice(-4)}`, decoded };
+    } catch (err) {
+      const raw = jwt.decode(token);
+      return {
+        status: 'INVALID',
+        reason: err instanceof Error ? err.message : String(err),
+        secretPreview: `${secret.slice(0, 4)}...${secret.slice(-4)}`,
+        rawPayload: raw,
+      };
+    }
   }
 }
